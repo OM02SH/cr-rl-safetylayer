@@ -1,0 +1,2 @@
+#{"t_start": 1742766553.6128979, "env_id": "commonroad-v1"}
+r,l,t,is_collision,is_time_out,is_off_road,is_friction_violation,is_goal_reached

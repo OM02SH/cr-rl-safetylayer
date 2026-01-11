@@ -1,0 +1,158 @@
+action_configs:
+  action_base: acceleration
+  action_type: continuous
+  continuous_collision_checking: false
+  lat_steps: 5
+  long_steps: 5
+  planning_horizon: 1.0
+cache_navigators: false
+check_collision_type: false
+ego_configs:
+  observe_a_ego: true
+  observe_global_turn_rate: true
+  observe_is_friction_violation: true
+  observe_jerk_ego: true
+  observe_relative_heading: true
+  observe_remaining_steps: true
+  observe_slip_angle: true
+  observe_steering_angle: false
+  observe_v_ego: true
+flatten_observation: true
+goal_configs:
+  observe_distance_goal_lat: true
+  observe_distance_goal_long: true
+  observe_distance_goal_long_lane: false
+  observe_distance_goal_orientation: false
+  observe_distance_goal_time: true
+  observe_distance_goal_velocity: false
+  observe_euclidean_distance: false
+  observe_is_goal_reached: true
+  observe_is_time_out: true
+  relax_is_goal_reached: true
+lane_change_time_threshold: 2.0
+lanelet_configs:
+  distances_and_ids_multilanelet_waypoints:
+  - - -1000
+    - 0
+    - 1000
+  - - 0
+    - 1
+  distances_route_reference_path:
+  - -1000
+  - 0
+  - 5
+  - 15
+  - 100
+  dynamic_extrapolation_samples:
+  - 0.1
+  - 0.25
+  - 1
+  - 2
+  non_strict_check_circle_radius: 0.5
+  observe_distance_togoal_via_referencepath: true
+  observe_dynamic_extrapolated_positions: false
+  observe_is_off_road: true
+  observe_lane_curvature: false
+  observe_lat_offset: true
+  observe_left_marker_distance: true
+  observe_left_road_edge_distance: true
+  observe_right_marker_distance: true
+  observe_right_road_edge_distance: true
+  observe_route_multilanelet_waypoints: false
+  observe_route_reference_path: true
+  observe_static_extrapolated_positions: false
+  static_extrapolation_samples:
+  - 1
+  - 2
+  - 5
+  - 10
+  - 25
+  strict_off_road_check: true
+max_lane_merge_range: 5000.0
+render_configs:
+  render_ccosy_nav_observations: false
+  render_combine_frames: false
+  render_dynamic_extrapolated_positions: false
+  render_ego_lanelet_center_vertices: false
+  render_follow_ego: false
+  render_global_ccosy: false
+  render_lidar_circle_surrounding_beams: false
+  render_lidar_circle_surrounding_obstacles: true
+  render_local_ccosy: false
+  render_range:
+  - 100.0
+  - 15.0
+  render_road_boundaries: false
+  render_skip_timesteps: 1
+  render_static_extrapolated_positions: false
+  render_surrounding_area: false
+  render_surrounding_obstacles_lane_based: true
+reward_configs:
+  hybrid_reward:
+    reward_close_goal_orientation: 5.0
+    reward_close_goal_velocity: 1.0
+    reward_closer_to_goal_lat: 10.0
+    reward_closer_to_goal_long: 10.0
+    reward_collision: -1000.0
+    reward_friction: 0.0
+    reward_friction_violation: 0.0
+    reward_get_close_goal_time: 1.0
+    reward_goal_reached: 2000.0
+    reward_jerk_lat: 0.0
+    reward_jerk_long: 0.0
+    reward_lat_distance_reference_path: 0.5
+    reward_lateral_velocity: 0.0
+    reward_long_distance_reference_path: 2.0
+    reward_off_road: -1000.0
+    reward_orientation_to_ref: 10.0
+    reward_reverse_driving: 0.0
+    reward_safe_distance_coef: -1.0
+    reward_same_lane_goal: 20.0
+    reward_stay_in_road_center: 0.0
+    reward_stop_sign_acc: 0.0
+    reward_stop_sign_vel: 0.0
+    reward_time_out: -200.0
+    stop_sign_vel_zero: 0.0
+  sparse_reward:
+    reward_collision: -50.0
+    reward_friction_violation: 0.0
+    reward_goal_reached: 100.0
+    reward_off_road: -50.0
+    reward_time_out: -10.0
+reward_type: hybrid_reward
+surrounding_configs:
+  dummy_dist: 500.0
+  dummy_dist_intersection: 50.0
+  dummy_dist_rate: 0.0
+  dummy_rel_vel: 0.0
+  fast_distance_calculation: true
+  lane_circ_sensor_range_radius: 500.0
+  lane_rect_sensor_range_length: 100.0
+  lane_rect_sensor_range_width: 7.0
+  lidar_circle_num_beams: 20
+  lidar_sensor_radius: 50.0
+  observe_ego_distance_intersection: false
+  observe_intersection_distances: false
+  observe_intersection_velocities: false
+  observe_is_collision: true
+  observe_lane_change: true
+  observe_lane_circ_surrounding: true
+  observe_lane_rect_surrounding: false
+  observe_lidar_circle_surrounding: false
+  observe_relative_priority: false
+  observe_vehicle_lights: false
+  observe_vehicle_type: false
+termination_configs:
+  terminate_on_collision: true
+  terminate_on_friction_violation: false
+  terminate_on_goal_reached: true
+  terminate_on_off_road: true
+  terminate_on_time_out: true
+traffic_sign_configs:
+  observe_priority_sign: false
+  observe_right_of_way_sign: false
+  observe_stop_sign: false
+  observe_yield_sign: false
+vehicle_params:
+  vehicle_model: 6
+  vehicle_type: 2
