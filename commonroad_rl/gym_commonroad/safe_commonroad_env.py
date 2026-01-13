@@ -468,11 +468,13 @@ class SafetyLayer(CommonroadEnv):
                     self.conflict_lanes[l.lanelet_id].append((k, is_right(l.center_vertices, k.center_vertices)))
         for l in self.scenario.lanelet_network.lanelets:
             center_dense = resample_polyline_with_distance(l.center_vertices, 0.5)
+            print("left: ", l.left_vertices)
+            print("center: ", l.center_vertices)
+            print("right: ", l.right_vertices)
+            print("dense center: ", center_dense)
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
-            print(l.left_vertices.shape)
             left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
-            print(left.shape)
             right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             # Extend first/last points to handle boundary
             left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
