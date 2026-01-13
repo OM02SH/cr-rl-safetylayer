@@ -3,7 +3,7 @@ from collections import defaultdict
 import numpy as np
 from typing import List,  Tuple, Optional, Union
 
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString
 from shapely.affinity import rotate, translate
 
 from commonroad.scenario.lanelet import Lanelet
@@ -363,14 +363,15 @@ class SafetyVerifier:
                         continue
                     def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                         start, end, _, dl, dr, _ = s
-                        if start != 0: start += 1
-                        left_bound = left_points[start: end + 2]
-                        right_bound = right_points[start: end + 2]
+                        left_bound = left_points[start: end + 1]
+                        right_bound = right_points[start: end + 1]
                         for i in range(len(left_bound)):
                             left_bound[i] = np.array(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl))
                             right_bound[i] = np.array(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] + dr))
                         lane_polygon = Polygon(left_bound + right_bound[::-1])
-                        return lane_polygon.contains(rect)
+                        if lane_polygon.contains(rect): return True
+                        # allow intersections with the end and start of the lane for lane change
+                        return not(LineString(left_bound).intersects(rect), LineString(right_bound).intersects(rect))
                     if in_safe_space(lp, rp):
                         return True
         return False
@@ -487,22 +488,11 @@ class SafetyLayer(CommonroadEnv):
             print("left: ", l.left_vertices)
             print("center: ", l.center_vertices)
             print("right: ", l.right_vertices)
-            print("dense center: ", center_dense)
+            # print("dense center: ", center_dense)
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
-            x,y = 0,0
-            try:
-                left = np.array([])
-                right = np.array([])
-                for x,y in l.left_vertices:
-                    np.append(left,ct.convert_to_curvilinear_coords(x, y))
-                for x,y in l.right_vertices:
-                    np.append(right,ct.convert_to_curvilinear_coords(x, y))
-                #left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
-                #right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
-            except CartesianProjectionDomainError:
-                print("CartesianProjectionDomainError : ", x ," - " , y)
-                exit(1)
+            left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
+            right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             # Extend first/last points to handle boundary
             left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
             right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
