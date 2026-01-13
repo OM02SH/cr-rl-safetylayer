@@ -18,7 +18,7 @@ from commonroad_clcs.config import CLCSParams
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 from commonroad.geometry.polyline_util import resample_polyline_with_distance
-
+from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
 def traveled_distance(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
@@ -468,19 +468,19 @@ class SafetyLayer(CommonroadEnv):
                     self.conflict_lanes[l.lanelet_id].append((k, is_right(l.center_vertices, k.center_vertices)))
         for l in self.scenario.lanelet_network.lanelets:
             def extend_centerline_to_include_points(center, left_pts, right_pts):
-                start_vec = center[0] - center[1]
-                start_points = np.vstack([left_pts[0], right_pts[0]])
-                start_distances = np.dot((start_points - center[0]), start_vec / np.linalg.norm(start_vec))
-                start_ext_len = max(0, -min(start_distances))
-                start_ext = center[0] + start_vec / np.linalg.norm(start_vec) * start_ext_len
-                center = np.vstack([start_ext, center])
+                vec = center[0] - center[1]
+                points = np.vstack([left_pts[0], right_pts[0]])
+                distances = np.dot((points - center[0]), vec / np.linalg.norm(vec))
+                ext_len = max(0, -min(distances))
+                ext = center[0] + vec / np.linalg.norm(vec) * ext_len
+                center = np.vstack([ext, center])
 
-                end_vec = center[-1] - center[-2]
-                end_points = np.vstack([left_pts[-1], right_pts[-1]])
-                end_distances = np.dot((end_points - center[-1]), end_vec / np.linalg.norm(end_vec))
-                end_ext_len = max(0, max(end_distances))
-                end_ext = center[-1] + end_vec / np.linalg.norm(end_vec) * end_ext_len
-                center = np.vstack([center, end_ext])
+                vec = center[-1] - center[-2]
+                points = np.vstack([left_pts[-1], right_pts[-1]])
+                distances = np.dot((points - center[-1]), vec / np.linalg.norm(vec))
+                ext_len = max(0, max(distances))
+                ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
+                center = np.vstack([center, ext])
                 return center
             center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
                                 (l.center_vertices,l.left_vertices,l.right_vertices), 0.5)
@@ -490,8 +490,20 @@ class SafetyLayer(CommonroadEnv):
             print("dense center: ", center_dense)
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
-            left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
-            right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
+            x,y = 0,0
+
+            try:
+                left = np.array([])
+                right = np.array([])
+                for x,y in l.left_vertices:
+                    np.append(left,ct.convert_to_curvilinear_coords(x, y))
+                for x,y in l.right_vertices:
+                    np.append(right,ct.convert_to_curvilinear_coords(x, y))
+                left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
+                right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
+            except CartesianProjectionDomainError:
+                print("CartesianProjectionDomainError : ", x ," - " , y)
+                exit(1)
             # Extend first/last points to handle boundary
             left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
             right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
