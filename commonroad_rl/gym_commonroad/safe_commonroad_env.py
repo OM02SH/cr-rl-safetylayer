@@ -467,7 +467,23 @@ class SafetyLayer(CommonroadEnv):
                 if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
                     self.conflict_lanes[l.lanelet_id].append((k, is_right(l.center_vertices, k.center_vertices)))
         for l in self.scenario.lanelet_network.lanelets:
-            center_dense = resample_polyline_with_distance(l.center_vertices, 0.5)
+            def extend_centerline_to_include_points(center, left_pts, right_pts):
+                start_vec = center[0] - center[1]
+                start_points = np.vstack([left_pts[0], right_pts[0]])
+                start_distances = np.dot((start_points - center[0]), start_vec / np.linalg.norm(start_vec))
+                start_ext_len = max(0, -min(start_distances))
+                start_ext = center[0] + start_vec / np.linalg.norm(start_vec) * start_ext_len
+                center = np.vstack([start_ext, center])
+
+                end_vec = center[-1] - center[-2]
+                end_points = np.vstack([left_pts[-1], right_pts[-1]])
+                end_distances = np.dot((end_points - center[-1]), end_vec / np.linalg.norm(end_vec))
+                end_ext_len = max(0, max(end_distances))
+                end_ext = center[-1] + end_vec / np.linalg.norm(end_vec) * end_ext_len
+                center = np.vstack([center, end_ext])
+                return center
+            center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
+                                (l.center_vertices,l.left_vertices,l.right_vertices), 0.5)
             print("left: ", l.left_vertices)
             print("center: ", l.center_vertices)
             print("right: ", l.right_vertices)
