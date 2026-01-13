@@ -41,8 +41,6 @@ class SafetyVerifier:
         self.precomputed_lane_polygons = precomputed_lane_polygons
         self.time_step = -1
         self.lane_width = 5
-        self.a_lon = prop_ego["a_lon"]
-        self.a_lat = prop_ego["a_lat"]
         self.ego_lanelet = None
 
     def get_reachable_lanes(self) -> List[Lanelet]:
@@ -240,7 +238,7 @@ class SafetyVerifier:
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
         txj += distance_to_add
         a_lat_max, a_lon_max, w, l, delta_react = (self.prop_ego["a_lat_max"], self.prop_ego["a_lon_max"],
-                self.prop_ego["w"], self.prop_ego["l"], self.prop_ego["delta_react"])
+                self.prop_ego["ego_width"], self.prop_ego["ego_length"], self.prop_ego["delta_react"])
         r_min = 1.0 / self.kappa(cp)
         v_crit = np.sqrt(r_min * a_lat_max)
         # s >= s_i + Δ_safe(v, i)
@@ -253,10 +251,10 @@ class SafetyVerifier:
             return a_lon_max * np.sqrt(max(0, 1 - (v ** 2 / v_crit ** 2) ** 2))
         # z(v,j) = v^2/(2 a_ego(v)) - v_j^2/(2 a_j_max) + delta_react*v
         def zeta_preceding(v, v_j, a_lon_max, v_crit, delta_react):
-            return (v ** 2) / (2 * abs(self.a_lon(v,a_lon_max,v_crit))) - (v_j ** 2) / (2 * abs(a_lon_max)) + delta_react * v
+            return (v ** 2) / (2 * abs(a_lon(v,a_lon_max,v_crit))) - (v_j ** 2) / (2 * abs(a_lon_max)) + delta_react * v
         # z(v,i) = v_i^2/(2|a_i_max|) - v^2/(2|a_ego(v)|) + delta_react*v_i
         def zeta_succeeding(v, v_i, a_lon_max, v_crit, delta_react):
-            return (v_i ** 2) / (2 * abs(a_lon_max)) - (v ** 2) / (2 * abs(self.a_lon(v,a_lon_max,v_crit))) + delta_react * v_i
+            return (v_i ** 2) / (2 * abs(a_lon_max)) - (v ** 2) / (2 * abs(a_lon(v,a_lon_max,v_crit))) + delta_react * v_i
         for v in vs:
             s_min_final = max(txi, max(zeta_succeeding(v,v_i,a_lon_max,v_crit,delta_react), 0))
             s_max_final = min(txj, max(zeta_preceding(v,v_j,a_lon_max,v_crit,delta_react), 0))
@@ -350,7 +348,7 @@ class SafetyVerifier:
         new_vehicle_state = curr_vehicle.get_new_state(ego_action.rescale_action(np.array([a, sv])), ego_action.action_base)
         p = new_vehicle_state.position
         nv = new_vehicle_state.velocity
-        W, L = self.prop_ego["w"], self.prop_ego["l"]
+        W, L = self.prop_ego["ego_width"], self.prop_ego["ego_length"]
         rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
         rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
         rect = translate(rect, xoff=p[0], yoff=p[1])
@@ -387,10 +385,9 @@ class SafetyLayer(CommonroadEnv):
         super().__init__(meta_scenario_path, train_reset_config_path, test_reset_config_path, visualization_path,
                          logging_path, test_env, play, config_file, logging_mode, **kwargs)
         self.observation = None
-        self.prop_ego = None
+        self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.safe_set = []
-        self.a_max = 5
         self.lane_width = 5
         self.last_relative_heading = 0
         self.v_max = 45
@@ -485,17 +482,20 @@ class SafetyLayer(CommonroadEnv):
                 return center
             center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
                                 (l.center_vertices,l.left_vertices,l.right_vertices), 0.1)
-            print("left: ", l.left_vertices)
-            print("center: ", l.center_vertices)
-            print("right: ", l.right_vertices)
-            print("dense center: ", center_dense[0], "  -  " , center_dense[-1])
+
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
             x,y = 0,0
+            left = np.array([])
+            right = np.array([])
             try:
                 left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
                 right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             except CartesianProjectionDomainError:
+                print("left: ", l.left_vertices)
+                print("center: ", l.center_vertices)
+                print("right: ", l.right_vertices)
+                print("dense center: ", center_dense[0], "  -  " , center_dense[-1])
                 print("Error point : ",x, "  ",y)
             # Extend first/last points to handle boundary
             left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
@@ -724,7 +724,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = self.get_per_intersection_lanes_update_priority(nxt_lane)
         else:
             self.priority(nxt_lane, self.pre_intersection_lanes)
-        if self.prop_ego["L"] / 2 >= self.observation["distance_to_lane_end"]:
+        if self.prop_ego["ego_length"] / 2 >= self.observation["distance_to_lane_end"]:
             fcl_input = self.compute_steering_velocity(nxt_lane.center_points)
             self.final_priority = 1
         else:
