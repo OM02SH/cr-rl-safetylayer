@@ -17,6 +17,7 @@ from commonroad_clcs.clcs import CurvilinearCoordinateSystem
 from commonroad_clcs.config import CLCSParams
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
+from commonroad.geometry.polyline_util import resample_polyline_with_distance
 
 def traveled_distance(curve: np.ndarray, target):
     """
@@ -144,7 +145,7 @@ class SafetyVerifier:
                 v_crit = np.sqrt(r_min * self.prop_ego["a_lat_max"])
                 return v_crit, traveled_distance(ls.center_vertices, ls.center_vertices[-1])
             else:
-                lso = self.sort_obstacles_in_lane(ls.center_vertices, lso)
+                lso = self.sort_obstacles_in_lane(ls.lanelet_id, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
                 lshape = lso[0].occupancy_at_time(self.time_step).shape
                 pts = self.get_lane_side_obs_intersection(lobs_state.position[0], lobs_state.position[1],
@@ -189,7 +190,7 @@ class SafetyVerifier:
         # empty lane with no vehicle entering or exiting it
         if len(obs) == 0:
             return [(center, lane, center[0], 0, center[len(center)-1], self.v_max, 0)]
-        obs = self.sort_obstacles_in_lane(center, obs)
+        obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
         obs_state = obs[0].state_at_time(self.time_step)
         pts = self.obs_start_end_index(obs[0], left, center, right)
         preceding_v = obs_state.velocity
@@ -212,9 +213,9 @@ class SafetyVerifier:
             C.append(self.get_end_collision_free_area(lane, center, pt, preceding_v))
         return C
 
-    def sort_obstacles_in_lane(self, center : np.ndarray,obs : List[Obstacle]) -> List[Obstacle]:
+    def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle]) -> List[Obstacle]:
         obs_with_center : List[Tuple[Obstacle, float]] = []
-        ct = CurvilinearCoordinateSystem(center,CLCSParams())
+        ct,_,_ = self.precomputed_lane_polygons[l_id]
         for ob in obs:
             pos = (ob.state_at_time(self.time_step).position[0], ob.state_at_time(self.time_step).position[1])
             pos_inlane = ct.convert_to_curvilinear_coords(*pos)
@@ -222,7 +223,7 @@ class SafetyVerifier:
         obs_with_center.sort(key=lambda k: k[1])
         return list(obs for obs, obs_center in obs_with_center)
 
-    def safeDistanceSetForSection(self, xi, yi, v_i, xj, yj, v_j,cp, distance_to_add):
+    def safeDistanceSetForSection(self, xi, yi, v_i, xj, yj, v_j,cp, l_id, distance_to_add):
         """
             This function takes the position and velocity of two Obstacles and the collision
             free area between them (as a part of the lane i.e. left-,center- and right points)
@@ -232,7 +233,7 @@ class SafetyVerifier:
                - v -> Velocities of the ego vehicle for each center
                - d -> The Area to leave on edges for safe bounds in the lane
         """
-        ct = CurvilinearCoordinateSystem(np.array(cp, dtype=float),CLCSParams())
+        ct,_,_ = self.precomputed_lane_polygons(l_id)
         tc = []
         for c in cp:    tc.append(ct.convert_to_curvilinear_coords(*c))
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
@@ -271,7 +272,7 @@ class SafetyVerifier:
         return safe_states
 
     def union_safe_set(self, ll: Lanelet, safe_set_list_left, rl : Lanelet, safe_set_list_right):
-        ct = CurvilinearCoordinateSystem(ll.center_vertices,CLCSParams())
+        (ct, _, _) = self.precomputed_lane_polygons[ll.lanelet_id]
         nls = []
         nrs = []
         for s in safe_set_list_left:
@@ -316,7 +317,7 @@ class SafetyVerifier:
             C.extend(self.get_lane_collision_free_areas(lane))
         for c in C:
             cp, l, vi, vj, d = c
-            S.append((self.safeDistanceSetForSection(cp[0][0],cp[0][1],vi,cp[-1][0],cp[-1][1],vj,cp,d),l))
+            S.append((self.safeDistanceSetForSection(cp[0][0],cp[0][1],vi,cp[-1][0],cp[-1][1],vj,cp,l.lanelet_id,d),l))
         #   For lane change we must have parts where the safe bounds don't exist,
         #   we do this by expanding the bounds into the adj lane when two safe states area are next to each other.
         #   We only do unions to the left side i.e. left lane with ego and ego with right lane.
@@ -466,11 +467,9 @@ class SafetyLayer(CommonroadEnv):
                 if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
                     self.conflict_lanes[l.lanelet_id].append((k, is_right(l.center_vertices, k.center_vertices)))
         for l in self.scenario.lanelet_network.lanelets:
-            if l.center_vertices.size < 6: continue
-            print(l.left_vertices)
-            print(l.center_vertices)
-            print(l.right_vertices)
-            ct = CurvilinearCoordinateSystem(l.center_vertices, CLCSParams())
+            center_dense = resample_polyline_with_distance(l.center_vertices, 0.5)
+            if center_dense.size < 6: continue
+            ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
             print(l.left_vertices.shape)
             left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
             print(left.shape)
@@ -666,7 +665,7 @@ class SafetyLayer(CommonroadEnv):
             intersection_lanes_obs = []
             for l in incoming_lanes:
                 obs = l.get_obstacles(self.scenario.obstacles, self.time_step)
-                obs = self.safety_verifier.sort_obstacles_in_lane(l.center_vertices, obs)
+                obs = self.safety_verifier.sort_obstacles_in_lane(l.lanelet_id, obs)
                 if not obs: continue
                 intersection_lanes_obs.append((l, obs[-1]))
             for k in intersection_lanes_obs:
