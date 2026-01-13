@@ -58,8 +58,8 @@ from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
 #print(gym.envs.registry['commonroad-v1'])
 
 # Create a Gym-based RL environment with specified data paths and environment configurations
-meta_scenario_path = "tutorials/data/highD/pickles/meta_scenario"
-training_data_path = "tutorials/data/highD/pickles/problem_train"
+meta_scenario_path = "tutorials/data/inD-dataset-v1.0/pickles/meta_scenario"
+training_data_path = "tutorials/data/inD-dataset-v1.0/pickles/problem_train"
 training_env = gym.make("commonroad-v1-safe",
                         meta_scenario_path=meta_scenario_path,
                         train_reset_config_path= training_data_path,
@@ -89,7 +89,7 @@ env_configs_test = copy.deepcopy(env_configs)
 env_configs_test["test_env"] = True
 
 # Create the testing environment
-testing_data_path = "tutorials/data/highD/pickles/problem_test"
+testing_data_path = "tutorials/data/inD-dataset-v1.0/pickles/problem_test"
 testing_env = gym.make("commonroad-v1-safe",
                        meta_scenario_path=meta_scenario_path,
                        test_reset_config_path=testing_data_path,
