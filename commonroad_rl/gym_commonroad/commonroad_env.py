@@ -140,8 +140,7 @@ class CommonroadEnv(gym.Env):
             self.meta_scenario_reset_dict = meta_scenario_path
 
         self.train_reset_config_path = train_reset_config_path
-        print(self.meta_scenario_reset_dict)
-        print("hey")
+
         def valid_scenario(problem, b_id):
             from commonroad_route_planner.route_planner import RoutePlanner
             scenario_id = ScenarioID.from_benchmark_id(b_id, "2020a")
