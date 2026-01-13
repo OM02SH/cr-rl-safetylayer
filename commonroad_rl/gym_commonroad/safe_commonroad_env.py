@@ -411,7 +411,7 @@ class SafetyLayer(CommonroadEnv):
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
         self.in_or_entering_intersection = self.intersection_check()
-        self.safety_verifier = SafetyVerifier(scenario,self.prop_ego,self.precomputed_lane_polygons)
+        self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
         self.safe_set = self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
         self.pre_intersection_lanes = None
         if self.in_or_entering_intersection:
