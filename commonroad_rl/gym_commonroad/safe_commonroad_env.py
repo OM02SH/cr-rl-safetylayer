@@ -467,6 +467,9 @@ class SafetyLayer(CommonroadEnv):
                     self.conflict_lanes[l.lanelet_id].append((k, is_right(l.center_vertices, k.center_vertices)))
         for l in self.scenario.lanelet_network.lanelets:
             if l.center_vertices.size < 6: continue
+            print(l.left_vertices)
+            print(l.center_vertices)
+            print(l.right_vertices)
             ct = CurvilinearCoordinateSystem(l.center_vertices, CLCSParams())
             print(l.left_vertices.shape)
             left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
