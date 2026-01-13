@@ -21,7 +21,7 @@ from commonroad_rl.utils_run.plot_util import plot_results as plot_results_basel
 from commonroad_rl.utils_run.plot_util import load_results as load_results_baselines
 
 try:
-    from gym_monitor.util import *
+    from gymnasium.utils import *
 except:
     pass
 
@@ -91,8 +91,12 @@ def ts2reward(results):
         (can be X_TIMESTEPS='timesteps', X_EPISODES='episodes' or X_WALLTIME='walltime_hrs')
     :return: (np.ndarray, np.ndarray) the x and y output
     """
-    print("results.monitor.columns: ", results.monitor.columns)
-    x_var = np.cumsum(results.monitor.l)
+    #print("results.monitor.columns: ", results.monitor.columns)
+    print("-----------------------------------------------------------------------------------")
+    print(results.monitor)
+    print("-----------------------------------------------------------------------------------")
+    results.monitor.columns = [c.strip() for c in results.monitor.columns]
+    x_var = np.cumsum(results.monitor["l"])
     y_var = results.monitor.r.values
 
     return x_var, y_var
@@ -317,11 +321,11 @@ PLOT_DICT = {
     "Valid Collision Rate": ts2collision,
     "Off-Road Rate": ts2off_road,
     "Time-Out Rate": ts2max_time,
-    "Infeasible Rate": ts2infeasible,
-    "LongitudinalInfeasible Rate": ts2LongitudinalInfeasible,
-    "LateralInfeasible Rate": ts2LateralInfeasible,
-    "NoLongDrivingCorridors Rate": ts2NoLongDrivingCorridors,
-    "Total Num Safe Actions": ts2num_safe_actions,
+    #"Infeasible Rate": ts2infeasible,
+    #"LongitudinalInfeasible Rate": ts2LongitudinalInfeasible,
+    #"LateralInfeasible Rate": ts2LateralInfeasible,
+    #"NoLongDrivingCorridors Rate": ts2NoLongDrivingCorridors,
+    #"Total Num Safe Actions": ts2num_safe_actions,
     # "Goal Reaching Time": ts2goal_time,
     # "Mean ego velocity": ts2v_ego,
     # "Total Robustness reward": ts2monitor_reward,

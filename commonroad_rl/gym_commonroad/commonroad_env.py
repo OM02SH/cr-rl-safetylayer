@@ -149,8 +149,8 @@ class CommonroadEnv(gym.Env):
             planning_problem: PlanningProblem = random.choice(list(problem["planning_problem_set"].planning_problem_dict.values()))
             route_planner = RoutePlanner(scenario, planning_problem,
                                          backend=RoutePlanner.Backend.NETWORKX_REVERSED, log_to_console=False, )
-            route_candidates = route_planner.plan_routes()
-            return len(route_candidates) > 0
+            route_candidates = route_planner.plan_routes().list_route_candidates
+            return len(route_candidates) > 0 and str(scenario_id)[-3:] == "T-1"
 
         def load_reset_config(path):
             path = pathlib.Path(path)

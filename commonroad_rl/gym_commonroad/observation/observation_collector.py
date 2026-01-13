@@ -280,7 +280,7 @@ class ObservationCollector:
                                                                                                       self.conflict_zone,
                                                                                                       self._ego_lanelet_ids)
         # print("observation_dict_surrounding: ", observation_dict_surrounding)
-        print("detected_obstacles: ", detected_obstacles)
+        # print("detected_obstacles: ", detected_obstacles)
 
         observation_dict_lanelet = self.lanelet_network_observation.observe(self._scenario, ego_vehicle,
                                                                             self.ego_lanelet, self.road_edge,

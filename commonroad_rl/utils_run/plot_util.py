@@ -220,21 +220,22 @@ def load_results(root_dir_or_dirs, enable_progress=True, enable_monitor=True, ve
 
                 if enable_monitor:
                     try:
-                        # monitor_result = monitor.load_results(dirname)
-                        # result['monitor'] = pandas.DataFrame(monitor_result)
-                        # 假设你有监控日志文件保存在 `dirname` 中
-                        log_files = [f for f in os.listdir(dirname) if f.endswith(".csv")]
-                        if not log_files:
+                        monitor_files = [f for f in os.listdir(dirname) if f.endswith(".monitor.csv") or f.endswith(".csv")]
+                        if not monitor_files:
                             print(f"skipping {dirname}: no monitor files")
                         else:
-                            # 读取 CSV 文件到 pandas DataFrame
-                            monitor_result = pandas.concat([pandas.read_csv(os.path.join(dirname, f)) for f in log_files], axis=0)
+                            dfs = []
+                            for f in monitor_files:
+                                path = os.path.join(dirname, f)
+                                # Skip SB3 metadata lines that start with #
+                                df = pandas.read_csv(path, comment="#",sep=',')
+                                dfs.append(df)
+                            # Concatenate all monitor CSVs
+                            monitor_result = pandas.concat(dfs, axis=0, ignore_index=True)
                             result['monitor'] = monitor_result
-                            print("1: csv changed here")
-                    # except monitor.LoadMonitorResultsError:
-                    #     print('skipping %s: no monitor files' % dirname)
+                            print("1: csv loaded correctly")
                     except Exception as e:
-                        print('exception loading monitor file in %s: %s' % (dirname, e))
+                        print(f'exception loading monitor file in {dirname}: {e}')
 
                 if result.get('monitor') is not None or result.get('progress') is not None:
                     allresults.append(Result(**result))
