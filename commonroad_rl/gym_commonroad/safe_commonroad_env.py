@@ -488,11 +488,15 @@ class SafetyLayer(CommonroadEnv):
             print("left: ", l.left_vertices)
             print("center: ", l.center_vertices)
             print("right: ", l.right_vertices)
-            # print("dense center: ", center_dense)
+            print("dense center: ", center_dense[0], "  -  " , center_dense[-1])
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
-            left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
-            right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
+            x,y = 0,0
+            try:
+                left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
+                right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
+            except CartesianProjectionDomainError:
+                print("Error point : ",x, "  ",y)
             # Extend first/last points to handle boundary
             left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
             right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
