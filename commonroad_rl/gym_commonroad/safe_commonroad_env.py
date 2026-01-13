@@ -483,7 +483,7 @@ class SafetyLayer(CommonroadEnv):
                 center = np.vstack([center, ext])
                 return center
             center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
-                                (l.center_vertices,l.left_vertices,l.right_vertices), 0.5)
+                                (l.center_vertices,l.left_vertices,l.right_vertices), 0.1)
             print("left: ", l.left_vertices)
             print("center: ", l.center_vertices)
             print("right: ", l.right_vertices)
@@ -491,7 +491,6 @@ class SafetyLayer(CommonroadEnv):
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
             x,y = 0,0
-
             try:
                 left = np.array([])
                 right = np.array([])
@@ -499,8 +498,8 @@ class SafetyLayer(CommonroadEnv):
                     np.append(left,ct.convert_to_curvilinear_coords(x, y))
                 for x,y in l.right_vertices:
                     np.append(right,ct.convert_to_curvilinear_coords(x, y))
-                left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
-                right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
+                #left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
+                #right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             except CartesianProjectionDomainError:
                 print("CartesianProjectionDomainError : ", x ," - " , y)
                 exit(1)
