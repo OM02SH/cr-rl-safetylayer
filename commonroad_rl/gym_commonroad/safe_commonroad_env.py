@@ -468,7 +468,9 @@ class SafetyLayer(CommonroadEnv):
         for l in self.scenario.lanelet_network.lanelets:
             if l.center_vertices.size < 6: continue
             ct = CurvilinearCoordinateSystem(l.center_vertices, CLCSParams())
+            print(l.left_vertices.shape)
             left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
+            print(left.shape)
             right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             # Extend first/last points to handle boundary
             left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
