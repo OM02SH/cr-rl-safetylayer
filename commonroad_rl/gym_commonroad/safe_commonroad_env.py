@@ -466,6 +466,7 @@ class SafetyLayer(CommonroadEnv):
                 if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
                     self.conflict_lanes[l.lanelet_id].append((k, is_right(l.center_vertices, k.center_vertices)))
         for l in self.scenario.lanelet_network.lanelets:
+            if l.center_vertices.size < 3: continue
             ct = CurvilinearCoordinateSystem(l.center_vertices, CLCSParams())
             left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
             right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
