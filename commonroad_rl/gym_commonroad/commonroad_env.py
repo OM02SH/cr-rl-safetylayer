@@ -145,7 +145,8 @@ class CommonroadEnv(gym.Env):
             from commonroad_route_planner.route_planner import RoutePlanner
             scenario_id = ScenarioID.from_benchmark_id(b_id, "2020a")
             map_id = parse_map_name(scenario_id)
-            print(self.meta_scenario_reset_dict.keys())
+            if map_id not in self.meta_scenario_reset_dict.keys():
+                return False
             scenario = restore_scenario(self.meta_scenario_reset_dict[map_id]["meta_scenario"], problem["obstacle"], scenario_id)
             planning_problem: PlanningProblem = random.choice(list(problem["planning_problem_set"].planning_problem_dict.values()))
             route_planner = RoutePlanner(scenario, planning_problem,
