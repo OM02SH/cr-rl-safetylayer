@@ -298,7 +298,7 @@ class ObservationCollector:
         self.observation_dict = OrderedDict((k, observation_dict[k]) for k in self.observation_space_dict.keys())
         assert list(self.observation_dict.keys()) == list(self.observation_space_dict.keys())
 
-        if self._flatten_observation:
+        """if self._flatten_observation:
             # print("Dict observation: ", self.observation_dict)
             observation_vector = np.zeros(self.observation_space.shape)
             index = 0
@@ -308,7 +308,8 @@ class ObservationCollector:
                 index += size
             return observation_vector
         else:
-            return self.observation_dict
+            return self.observation_dict"""
+        return self.observation_dict
         
     def observe_surrounding_obstacles(self, ego_vehicle: Vehicle) -> List[Obstacle]:
         self._ego_vehicle = ego_vehicle

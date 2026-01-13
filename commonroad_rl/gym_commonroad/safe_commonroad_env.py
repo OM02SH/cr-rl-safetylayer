@@ -16,7 +16,7 @@ from commonroad.scenario.obstacle import Obstacle
 from commonroad_clcs.clcs import CurvilinearCoordinateSystem
 from commonroad_clcs.config import CLCSParams
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
-from utils.stanley_controller_piecewise import StanleyController
+from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 
 def traveled_distance(curve: np.ndarray, target):
     """
@@ -142,15 +142,15 @@ class SafetyVerifier:
             if len(lso) == 0:
                 r_min = 1.0 / self.kappa(ls.center_vertices)
                 v_crit = np.sqrt(r_min * self.prop_ego["a_lat_max"])
-                return v_crit, traveled_distance(ls.center_vertices.tolist(), ls.center_vertices.tolist()[-1])
+                return v_crit, traveled_distance(ls.center_vertices, ls.center_vertices[-1])
             else:
                 lso = self.sort_obstacles_in_lane(ls.center_vertices, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
                 lshape = lso[0].occupancy_at_time(self.time_step).shape
                 pts = self.get_lane_side_obs_intersection(lobs_state.position[0], lobs_state.position[1],
                                                           lobs_state.orientation, lshape.length, lshape.width,
-                                                          ls.center_vertices.tolist())
-                return lobs_state.velocity, traveled_distance(ls.center_vertices.tolist(), ls.center_vertices[pts[0]])
+                                                          ls.center_vertices)
+                return lobs_state.velocity, traveled_distance(ls.center_vertices, ls.center_vertices[pts[0]])
         if len(successors) == 1:
             v,d = get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successors[0]))
         else:
@@ -404,11 +404,10 @@ class SafetyLayer(CommonroadEnv):
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
-        center_points = self.observation_collector.ego_lanelet.center_vertices
+        center_points = self.observation_collector.ego_lanelet.center_vertices.reshape(-1, 2)
         closest_centerpoint = center_points[
             np.linalg.norm(center_points - self.observation_collector._ego_state.position, axis=1).argmin()]
-        initial_observation["distance_to_lane_end"] = traveled_distance(center_points.tolist()[::, -1],
-                                                                     closest_centerpoint)
+        initial_observation["distance_to_lane_end"] = traveled_distance(center_points[::-1], closest_centerpoint)
         self.observation = initial_observation
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
@@ -424,8 +423,13 @@ class SafetyLayer(CommonroadEnv):
             actions = self.lane_safety()
         initial_observation["safe_actions"] = actions
         initial_observation["final_priority"] = self.final_priority
-
-        return initial_observation, info
+        observation_vector = np.zeros(self.observation_space.shape)
+        index = 0
+        for k in initial_observation.keys():
+            size = np.prod(initial_observation[k].shape)
+            observation_vector[index: index + size] = initial_observation[k].flat
+            index += size
+        return observation_vector, info
 
     def compute_lane_sides_and_conflict(self):
         """
@@ -496,7 +500,7 @@ class SafetyLayer(CommonroadEnv):
             reward -= 800
         center_points = self.observation_collector.ego_lanelet.center_vertices
         closest_centerpoint = center_points[np.linalg.norm(center_points - self.observation_collector._ego_state.position, axis=1).argmin()]
-        observation["distance_to_lane_end"] = traveled_distance(center_points.tolist()[::,-1],closest_centerpoint)
+        observation["distance_to_lane_end"] = traveled_distance(center_points[::,-1],closest_centerpoint)
         self.observation = observation
         self.time_step += 1
         self.safe_set = self.safety_verifier.safeDistanceSet()
@@ -509,7 +513,13 @@ class SafetyLayer(CommonroadEnv):
             actions = self.lane_safety()
         observation["safe_actions"] = actions
         observation["final_priority"] = self.final_priority
-        return observation, reward, terminated, truncated, info
+        observation_vector = np.zeros(self.observation_space.shape)
+        index = 0
+        for k in observation.keys():
+            size = np.prod(observation[k].shape)
+            observation_vector[index: index + size] = observation[k].flat
+            index += size
+        return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
         in_conflict_after = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_state)
