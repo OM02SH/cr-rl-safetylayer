@@ -406,13 +406,13 @@ class SafetyLayer(CommonroadEnv):
         center_points = self.observation_collector.ego_lanelet.center_vertices.reshape(-1, 2)
         closest_centerpoint = center_points[
             np.linalg.norm(center_points - self.observation_collector._ego_state.position, axis=1).argmin()]
+        self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
         initial_observation["distance_to_lane_end"] = traveled_distance(center_points[::-1], closest_centerpoint)
         self.observation = initial_observation
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
         self.in_or_entering_intersection = self.intersection_check()
         print(self.scenario.scenario_id)
-        self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
         self.safe_set = self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
         self.pre_intersection_lanes = None
         if self.in_or_entering_intersection:
