@@ -498,8 +498,8 @@ class SafetyLayer(CommonroadEnv):
                 print("dense center: ", center_dense[0], "  -  " , center_dense[-1])
                 print("Error point : ",x, "  ",y)
             # Extend first/last points to handle boundary
-            left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
-            right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
+            #left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
+            #right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, left, right)
 
     def step(self, action: Union[np.ndarray, State]) -> Tuple[np.ndarray, float, bool, dict]:
