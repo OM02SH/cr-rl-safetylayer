@@ -484,7 +484,7 @@ class SafetyLayer(CommonroadEnv):
             actions = self.lane_safety()
         if actions.size > 11:   actions = actions[:11]
         elif actions.size < 11:   actions = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
-        self.observation["actions"] = actions
+        self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
         observation_vector = self.pack_observation(initial_observation)
         return observation_vector, info
