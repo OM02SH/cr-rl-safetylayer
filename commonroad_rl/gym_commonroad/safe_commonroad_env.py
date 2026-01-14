@@ -37,7 +37,7 @@ class SafetyVerifier:
         self.v_max = 45
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
-        self.safe_set = []
+        self.safe_set : List[Tuple[List[Tuple[np.ndarray,np.ndarray,float,float,float]],Lanelet]] = []
         self.precomputed_lane_polygons : Dict[CurvilinearCoordinateSystem ,np.ndarray ,np.ndarray] = precomputed_lane_polygons
         self.time_step = -1
         self.lane_width = 5
@@ -243,7 +243,8 @@ class SafetyVerifier:
         obs_with_center.sort(key=lambda k: k[1])
         return list(obs for obs, obs_center in obs_with_center)
 
-    def safeDistanceSetForSection(self, xi, yi, v_i, xj, yj, v_j,cp, l_id, distance_to_add):
+    def safeDistanceSetForSection(self, xi, yi, v_i, xj, yj, v_j,cp, l_id, distance_to_add) \
+            -> List[Tuple[np.ndarray,np.ndarray,float,float,float]] :
         """
             This function takes the position and velocity of two Obstacles and the collision
             free area between them (as a part of the lane i.e. left-,center- and right points)
@@ -300,11 +301,11 @@ class SafetyVerifier:
         nls = []
         nrs = []
         for s in safe_set_list_left:
-            c1, c2, lv, dl, _, l_lane = s
+            c1, c2, lv, dl, _ = s
             l_start = ct.convert_to_curvilinear_coords(c1[0], c1[1])
             l_end = ct.convert_to_curvilinear_coords(c2[0], c2[1])
             for c in safe_set_list_right:
-                c1, c2, rv, _, dr, r_lane = c
+                c1, c2, rv, _, dr = c
                 r_start = ct.convert_to_curvilinear_coords(c1[0], c1[1])
                 r_end = ct.convert_to_curvilinear_coords(c2[0], c2[1])
                 start = max(l_start, r_start)
@@ -335,7 +336,7 @@ class SafetyVerifier:
         self.ego_lanelet = ego_lanelet
         self.time_step += 1
         self.in_or_entering_intersection = in_or_entering_intersection
-        S = []
+        S : List[Tuple[List[Tuple[np.ndarray,np.ndarray,float,float,float]],Lanelet]] = []
         C = []
         for lane in self.get_reachable_lanes():
             C.extend(self.get_lane_collision_free_areas(lane))
@@ -347,27 +348,27 @@ class SafetyVerifier:
         #   We only do unions to the left side i.e. left lane with ego and ego with right lane.
         es = []
         for s in S:
-            _, _, _, _, _, lane = s
+            k, lane = s
             if lane == self.ego_lanelet:
-                es.append(s)
+                es.extend(k)
         if not self.in_or_entering_intersection:
             if self.ego_lanelet.adj_left_same_direction:
                 ll : Lanelet = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
                 ls = []
                 for s in S:
-                    _, _, _, _, _, lane = s
+                    k, lane = s
                     if lane.lanelet_id == ll:
-                        ls.append(s)
+                        ls.extend(k)
                 S.extend(self.union_safe_set(ll,ls,self.ego_lanelet,es))
             if self.ego_lanelet.adj_right_same_direction:
                 rl : Lanelet = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right)
                 rs = []
                 for s in S:
-                    _, _, _, _, _, lane = s
+                    k, lane = s
                     if lane.lanelet_id == rl:
-                        rs.append(s)
+                        rs.extend(k)
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
-        return S
+        self.safe_set = S
 
     def safe_action_check(self, a, sv, ego_action):
         curr_vehicle: ContinuousVehicle = ego_action.vehicle
@@ -381,23 +382,23 @@ class SafetyVerifier:
         for l in self.get_reachable_lanes():
             ct,lp,rp = self.precomputed_lane_polygons[l.lanelet_id]
             for s in self.safe_set:
-                _, _, v, _, _, lane = s
+                k, lane = s
                 if lane.lanelet_id == l.lanelet_id:
-                    if not v - 0.1 <= nv <= v + 0.1:
-                        continue
-                    def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
-                        start, end, _, dl, dr, _ = s
-                        left_bound = left_points[start: end + 1]
-                        right_bound = right_points[start: end + 1]
-                        for i in range(len(left_bound)):
-                            left_bound[i] = np.array(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl))
-                            right_bound[i] = np.array(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] + dr))
-                        lane_polygon = Polygon(left_bound + right_bound[::-1])
-                        if lane_polygon.contains(rect): return True
-                        # allow intersections with the end and start of the lane for lane change
-                        return not(LineString(left_bound).intersects(rect), LineString(right_bound).intersects(rect))
-                    if in_safe_space(lp, rp):
-                        return True
+                    for start, end, v, dl, dr in k:
+                        if not v - 0.1 <= nv <= v + 0.1:
+                            continue
+                        def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
+                            left_bound = left_points[start: end + 1]
+                            right_bound = right_points[start: end + 1]
+                            for i in range(len(left_bound)):
+                                left_bound[i] = np.array(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl))
+                                right_bound[i] = np.array(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] + dr))
+                            lane_polygon = Polygon(left_bound + right_bound[::-1])
+                            if lane_polygon.contains(rect): return True
+                            # allow intersections with the end and start of the lane for lane change
+                            return not(LineString(left_bound).intersects(rect), LineString(right_bound).intersects(rect))
+                        if in_safe_space(lp, rp):
+                            return True
         return False
 
 
@@ -413,7 +414,6 @@ class SafetyLayer(CommonroadEnv):
         self.observation = None
         self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
-        self.safe_set = []
         self.lane_width = 5
         self.last_relative_heading = 0
         self.v_max = 45
@@ -438,7 +438,7 @@ class SafetyLayer(CommonroadEnv):
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
         self.in_or_entering_intersection = self.intersection_check()
-        self.safe_set = self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
+        self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
         self.pre_intersection_lanes = None
         if self.in_or_entering_intersection:
             actions = self.intersection_safety()
@@ -561,7 +561,7 @@ class SafetyLayer(CommonroadEnv):
         observation["distance_to_lane_end"] = traveled_distance(center_points[::,-1],closest_centerpoint)
         self.observation = observation
         self.time_step += 1
-        self.safe_set = self.safety_verifier.safeDistanceSet()
+        self.safety_verifier.safeDistanceSet()
         self.in_or_entering_intersection = self.intersection_check()
         if self.in_or_entering_intersection:
             actions =self.intersection_safety()
