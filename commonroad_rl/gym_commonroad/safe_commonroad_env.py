@@ -433,7 +433,7 @@ class SafetyLayer(CommonroadEnv):
         self.compute_lane_sides_and_conflict()
         ct ,_ ,_ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
         center_points = ct.reference_path_original
-        ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(2,-1)
+        ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(-1)
         print(ego_pos.shape)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
