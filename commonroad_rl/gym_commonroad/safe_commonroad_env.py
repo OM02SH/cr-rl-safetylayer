@@ -447,7 +447,7 @@ class SafetyLayer(CommonroadEnv):
             self.final_priority = -1
             actions = self.lane_safety()
         initial_observation["safe_actions"] = actions
-        initial_observation["final_priority"] = self.final_priority
+        initial_observation["final_priority"] = np.array([self.final_priority], dtype=object)
         observation_vector = np.zeros(self.observation_space.shape)
         index = 0
         for k in initial_observation.keys():
