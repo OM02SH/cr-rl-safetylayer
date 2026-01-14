@@ -341,8 +341,10 @@ class SafetyVerifier:
             C.extend(self.get_lane_collision_free_areas(lane))
         for c in C:
             cp, l, vi, vj, d = c
+            print(cp)
             print(type(cp))
             print(type(cp[0]))
+            print(type(cp[0][0]))
             print(type(l))
             print(type(vi))
             print(type(vj))
