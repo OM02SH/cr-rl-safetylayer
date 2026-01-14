@@ -430,12 +430,14 @@ class SafetyLayer(CommonroadEnv):
             np.array([0.0], dtype=np.float32),  # distance_to_lane_end
             np.full(33, -1.0, dtype=np.float32),  # safe_actions
             np.array([-1.0], dtype=np.float32),  # final_priority
+            np.full(23, -1.0, dtype=np.float32)
         ])
         self.new_high = np.concatenate([
             self.observation_collector.observation_space.high.astype(np.float32),
             np.array([np.inf], dtype=np.float32),
             np.full(33, 1.0, dtype=np.float32),
             np.array([1.0], dtype=np.float32),
+            np.full(23, 1.0, dtype=np.float32)
         ])
 
     def pack_observation(self, observation_dict):
