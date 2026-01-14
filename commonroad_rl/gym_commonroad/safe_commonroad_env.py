@@ -691,7 +691,7 @@ class SafetyLayer(CommonroadEnv):
             safe_min, safe_max = self.find_safe_acceleration(sv)
             if safe_min <= safe_max:    At_safe_l.append((sv,(safe_min, safe_max)))
             else: At_safe_l.append((sv,None))
-        return np.array(At_safe_l, dtype=Tuple[float, Tuple[float,float]])
+        return np.array(At_safe_l, dtype=object)
 
     def priority_condition(self, lane : Lanelet,obstacle : Obstacle, D_m=30.0, T_a=3.0):
         """
@@ -747,7 +747,7 @@ class SafetyLayer(CommonroadEnv):
         """
             Returns an array of safe actions each as a tuple of (sv,(a_min,a_max))
         """
-        At_safe_in = []
+        At_safe_in : List[Tuple[float, Tuple[float,float]]] = []
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
         if curr_index == len(route_ids) - 1:
@@ -771,5 +771,5 @@ class SafetyLayer(CommonroadEnv):
             if safe_min <= safe_max:
                 At_safe_in.append((sv, (safe_min, safe_max)))
             else:
-                At_safe_in.append((sv, None))
-        return np.ndarray(At_safe_in, dtype=Tuple[float, Tuple[float,float]])
+                At_safe_in.append((sv, (0,0)))
+        return np.array(At_safe_in, dtype=object)
