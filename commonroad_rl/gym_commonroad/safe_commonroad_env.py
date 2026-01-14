@@ -3,6 +3,7 @@ from collections import defaultdict
 import numpy as np
 from typing import List, Tuple, Optional, Union, Dict
 
+from gymnasium import spaces
 from shapely.geometry import Polygon, LineString
 from shapely.affinity import rotate, translate
 
@@ -425,6 +426,9 @@ class SafetyLayer(CommonroadEnv):
         self.precomputed_lane_polygons = {}
         self.safety_verifier = None
         self.in_or_entering_intersection = False
+        new_low = np.concatenate((self.observation_space.low, np.zeros(13)))
+        new_high = np.concatenate((self.observation_space.high, np.full(13, np.inf)))
+        self.observation_space_safe = spaces.Box(low=new_low, high=new_high, dtype=self.observation_space.dtype)
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
@@ -452,9 +456,7 @@ class SafetyLayer(CommonroadEnv):
             actions = self.lane_safety()
         initial_observation["safe_actions"] = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
         initial_observation["final_priority"] = np.array([self.final_priority], dtype=object)
-        observation_vector = np.concatenate([v.flat for v in initial_observation.values()])
-        observation_vector = np.zeros(self.observation_space.shape + initial_observation["safe_actions"].shape +
-            initial_observation["final_priority"].shape + initial_observation["distance_to_lane_end"].shape)
+        observation_vector = np.zeros(self.observation_space_safe.shape)
         index = 0
         for k in initial_observation.keys():
             size = np.prod(initial_observation[k].shape)
