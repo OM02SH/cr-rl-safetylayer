@@ -179,12 +179,8 @@ class SafetyVerifier:
         C = []
         center = self.dense_lanes[lane.lanelet_id][1]
         obs = lane.get_obstacles(self.scenario.obstacles, self.time_step)
-        l_id = None
-        r_id = None
-        if lane.adj_left_same_direction:
-            l_id = lane.adj_left
-        if lane.adj_right_same_direction:
-            r_id = lane.adj_right
+        l_id = lane.adj_left if lane.adj_left_same_direction else None
+        r_id = lane.adj_right if lane.adj_right_same_direction else None
         # empty lane with no vehicle entering or exiting it
         if len(obs) == 0:
             print("Empty lane")
@@ -195,7 +191,8 @@ class SafetyVerifier:
         pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
         while pts is None:
             i += 1
-            if len(obs) == 1:
+            if len(obs) == i:
+                for o in obs: print(o)
                 print("Empty lane")
                 return [(center, lane, 0.0, self.v_max, 0.0)]
             obs_state = obs[i].state_at_time(self.time_step)
@@ -336,14 +333,6 @@ class SafetyVerifier:
             C.extend(self.get_lane_collision_free_areas(lane))
         for c in C:
             cp, l, vi, vj, d = c
-            print(cp)
-            print(type(cp))
-            print(type(cp[0]))
-            print(type(cp[0][0]))
-            print(type(l))
-            print(type(vi))
-            print(type(vj))
-            print(type(d))
             S.append((self.safeDistanceSetForSection(cp[0][0],cp[0][1],vi,cp[-1][0],cp[-1][1],vj,cp,l.lanelet_id,d),l))
         #   For lane change we must have parts where the safe bounds don't exist,
         #   we do this by expanding the bounds into the adj lane when two safe states area are next to each other.
