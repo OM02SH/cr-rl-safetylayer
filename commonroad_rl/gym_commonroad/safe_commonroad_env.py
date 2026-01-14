@@ -452,12 +452,7 @@ class SafetyLayer(CommonroadEnv):
             actions = self.lane_safety()
         initial_observation["safe_actions"] = actions
         initial_observation["final_priority"] = np.array([self.final_priority], dtype=object)
-        observation_vector = np.zeros(self.observation_space.shape)
-        index = 0
-        for k in initial_observation.keys():
-            size = np.prod(initial_observation[k].shape)
-            observation_vector[index: index + size] = initial_observation[k].flat
-            index += size
+        observation_vector = np.concatenate([v.flat for v in initial_observation.values()])
         return observation_vector, info
 
     def compute_lane_sides_and_conflict(self):
