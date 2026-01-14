@@ -429,14 +429,15 @@ class SafetyLayer(CommonroadEnv):
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
-        center_points = self.observation_collector.ego_lanelet.center_vertices.reshape(-1, 2)
+        self.time_step = 0
+        self.compute_lane_sides_and_conflict()
+        ct ,_ ,_ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
+        center_points = ct.reference_path_original
         closest_centerpoint = center_points[
             np.linalg.norm(center_points - self.observation_collector._ego_state.position, axis=1).argmin()]
         self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
-        initial_observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::,-1],closest_centerpoint)], dtype= object)
+        initial_observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
         self.observation = initial_observation
-        self.time_step = 0
-        self.compute_lane_sides_and_conflict()
         self.in_or_entering_intersection = self.intersection_check()
         self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
         self.pre_intersection_lanes = None
@@ -553,11 +554,11 @@ class SafetyLayer(CommonroadEnv):
         if reward_for_safe_action:
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
-        else:
-            reward -= 800
-        center_points = self.observation_collector.ego_lanelet.center_vertices
+        else:   reward -= 800
+        ct, _, _ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
+        center_points = ct.reference_path_original
         closest_centerpoint = center_points[np.linalg.norm(center_points - self.observation_collector._ego_state.position, axis=1).argmin()]
-        observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::,-1],closest_centerpoint)], dtype= object)
+        observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
         self.observation = observation
         self.time_step += 1
         self.safety_verifier.safeDistanceSet()
