@@ -189,9 +189,15 @@ class SafetyVerifier:
         if len(obs) == 0:
             print("Empty lane")
             return [(center, lane, 0, self.v_max, 0)]
+        i = 0
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
-        obs_state = obs[0].state_at_time(self.time_step)
-        pts = self.obs_start_end_index(obs[0], left, center, right)
+        print("obs: ", obs)
+        obs_state = obs[i].state_at_time(self.time_step)
+        pts = self.obs_start_end_index(obs[i], left, center, right)
+        if pts is None:
+            i += 1
+            obs_state = obs[i].state_at_time(self.time_step)
+            pts = self.obs_start_end_index(obs[i], left, center, right)
         preceding_v = obs_state.velocity
         if len(pts) == 1:   pt = pts[0]
         else:
