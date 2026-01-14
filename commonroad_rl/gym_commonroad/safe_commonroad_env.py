@@ -1,7 +1,7 @@
 import math
 from collections import defaultdict
 import numpy as np
-from typing import List,  Tuple, Optional, Union
+from typing import List, Tuple, Optional, Union, Dict
 
 from shapely.geometry import Polygon, LineString
 from shapely.affinity import rotate, translate
@@ -38,7 +38,7 @@ class SafetyVerifier:
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
         self.safe_set = []
-        self.precomputed_lane_polygons = precomputed_lane_polygons
+        self.precomputed_lane_polygons : Dict[CurvilinearCoordinateSystem ,np.ndarray ,np.ndarray] = precomputed_lane_polygons
         self.time_step = -1
         self.lane_width = 5
         self.ego_lanelet = None
@@ -214,10 +214,17 @@ class SafetyVerifier:
 
     def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle]) -> List[Obstacle]:
         obs_with_center : List[Tuple[Obstacle, float]] = []
-        ct,_,_ = self.precomputed_lane_polygons[l_id]
+        ct, _, _ = self.precomputed_lane_polygons[l_id]
         for ob in obs:
             pos = (ob.state_at_time(self.time_step).position[0], ob.state_at_time(self.time_step).position[1])
-            pos_inlane = ct.convert_to_curvilinear_coords(*pos)
+            try:
+                pos_inlane = ct.convert_to_curvilinear_coords(*pos)
+            except CartesianProjectionDomainError:
+                cp = ct.reference_path_original()
+                if math.dist(pos,cp[0]) > math.dist(pos,cp[1]):
+                    pos_inlane = ct.convert_to_curvilinear_coords(cp[1])
+                else:
+                    pos_inlane = ct.convert_to_curvilinear_coords(cp[0])
             obs_with_center.append((ob, pos_inlane[0]))
         obs_with_center.sort(key=lambda k: k[1])
         return list(obs for obs, obs_center in obs_with_center)
