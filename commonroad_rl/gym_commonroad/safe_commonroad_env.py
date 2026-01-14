@@ -526,13 +526,6 @@ class SafetyLayer(CommonroadEnv):
         self.dense_lanes.clear()
         self.conflict_lanes.clear()
         for l in self.scenario.lanelet_network.lanelets:
-            for k in self.scenario.lanelet_network.lanelets:
-                if l == k or (l.predecessor and k.predecessor and l.predecessor == k.predecessor):
-                    continue
-                if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
-                    self.conflict_lanes[l.lanelet_id].append((k,
-                            is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])))
-        for l in self.scenario.lanelet_network.lanelets:
             def extend_centerline_to_include_points(center, left_pts, right_pts):
                 vec = center[0] - center[1]
                 points = np.vstack([left_pts[0], right_pts[0]])
@@ -575,6 +568,13 @@ class SafetyLayer(CommonroadEnv):
             #left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
             #right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, left, right)
+        for l in self.scenario.lanelet_network.lanelets:
+            for k in self.scenario.lanelet_network.lanelets:
+                if l == k or (l.predecessor and k.predecessor and l.predecessor == k.predecessor):
+                    continue
+                if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
+                    self.conflict_lanes[l.lanelet_id].append((k,
+                            is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])))
 
     def step(self, action: Union[np.ndarray, State]) -> Tuple[np.ndarray, float, bool, dict]:
         reward_for_safe_action = 0
