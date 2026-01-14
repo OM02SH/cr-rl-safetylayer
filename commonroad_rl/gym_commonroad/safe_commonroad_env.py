@@ -451,7 +451,11 @@ class SafetyLayer(CommonroadEnv):
                 index += size
             return observation_vector
         base = pack_orig()
-        sa = np.asarray(self.observation["safe_actions"], dtype=np.float32).ravel()
+        sa_list = []
+        for elem in self.observation["safe_actions"]:
+            sv, a_tuple = elem
+            sa_list.extend([sv, a_tuple[0], a_tuple[1]])
+        sa = np.array(sa_list, dtype=np.float32)
         vec = np.zeros(sa.size + 2 + base.size, dtype=np.float32)
         idx = 0
         vec[idx:idx + base.size] = base
