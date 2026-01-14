@@ -629,6 +629,10 @@ class SafetyLayer(CommonroadEnv):
             return False
         if (self.observation["v_ego"]**2 / (2 * a_max) < self.observation["distance_to_lane_end"] or
                 self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys()):
+            if self.observation["v_ego"]**2 / (2 * a_max) < self.observation["distance_to_lane_end"]:
+                print("near lane end")
+            else:
+                print("in intersection")
             return True
         return False
 
@@ -673,7 +677,7 @@ class SafetyLayer(CommonroadEnv):
             This does a max of 396 checks to build the Safe action set
         """
         At_safe_l = []
-        fcl_input = self.compute_steering_velocity(self.observation_collector.ego_lanelet.center_points)
+        fcl_input = self.compute_steering_velocity(self.observation_collector.ego_lanelet.center_vertices)
         if self.observation_collector.ego_lanelet.adj_left_same_direction:
             if self.observation_collector.ego_lanelet.adj_right_same_direction:
                 steering_velocities = np.linspace(-1, 1, 11) # left, current and right
@@ -755,12 +759,12 @@ class SafetyLayer(CommonroadEnv):
         else:
             self.priority(nxt_lane, self.pre_intersection_lanes)
         if self.prop_ego["ego_length"] / 2 >= self.observation["distance_to_lane_end"]:
-            fcl_input = self.compute_steering_velocity(nxt_lane.center_points)
+            fcl_input = self.compute_steering_velocity(nxt_lane.center_vertices)
             self.final_priority = 1
         else:
             if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys():
                 self.final_priority = 1
-            fcl_input = self.compute_steering_velocity(self.observation_collector.ego_lanelet.center_points)
+            fcl_input = self.compute_steering_velocity(self.observation_collector.ego_lanelet.center_vertices)
         steering_velocities = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for sv in steering_velocities:
             safe_min, safe_max = self.find_safe_acceleration(sv)
