@@ -193,6 +193,7 @@ class SafetyVerifier:
             i += 1
             if len(obs) == i:
                 for o in obs: print(o)
+                print(center)
                 print("Empty lane")
                 return [(center, lane, 0.0, self.v_max, 0.0)]
             obs_state = obs[i].state_at_time(self.time_step)
