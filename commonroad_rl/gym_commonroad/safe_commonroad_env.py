@@ -435,7 +435,8 @@ class SafetyLayer(CommonroadEnv):
         center_points = ct.reference_path_original
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
         print(ego_pos.shape)
-        print(center_points)
+        print(len(center_points))
+        for k in center_points: print(k)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
         initial_observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
