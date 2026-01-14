@@ -242,7 +242,7 @@ class SafetyVerifier:
         obs_with_center.sort(key=lambda k: k[1])
         return list(obs for obs, obs_center in obs_with_center)
 
-    def safeDistanceSetForSection(self, xi, yi, v_i, xj, yj, v_j,cp, l_id, distance_to_add) \
+    def safeDistanceSetForSection(self, xi:float, yi:float, v_i:float, xj:float, yj:float, v_j:float,cp, l_id, distance_to_add) \
             -> List[Tuple[np.ndarray,np.ndarray,float,float,float]] :
         """
             This function takes the position and velocity of two Obstacles and the collision
@@ -341,6 +341,12 @@ class SafetyVerifier:
             C.extend(self.get_lane_collision_free_areas(lane))
         for c in C:
             cp, l, vi, vj, d = c
+            print(type(cp))
+            print(type(cp[0]))
+            print(type(l))
+            print(type(vi))
+            print(type(vj))
+            print(type(d))
             S.append((self.safeDistanceSetForSection(cp[0][0],cp[0][1],vi,cp[-1][0],cp[-1][1],vj,cp,l.lanelet_id,d),l))
         #   For lane change we must have parts where the safe bounds don't exist,
         #   we do this by expanding the bounds into the adj lane when two safe states area are next to each other.
