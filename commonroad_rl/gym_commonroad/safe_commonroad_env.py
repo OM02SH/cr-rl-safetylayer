@@ -449,14 +449,14 @@ class SafetyLayer(CommonroadEnv):
                 observation_vector[index: index + size] = observation_dict[k].flat
                 index += size
             return observation_vector
-        vec = np.zeros(self.observation_space_safe.shape, dtype=np.float32)
-        idx = 0
         base = pack_orig()
+        sa = self.observation["safe_actions"].reshape(-1)
+        vec = np.zeros(sa.size + 2 + base.size, dtype=np.float32)
+        idx = 0
         vec[idx:idx + base.size] = base
         idx += base.size
         vec[idx] = float(self.observation["distance_to_lane_end"])
         idx += 1
-        sa = self.observation["safe_actions"].reshape(-1)
         vec[idx:idx + sa.size] = sa
         idx += sa.size
         vec[idx] = float(self.observation["final_priority"])
