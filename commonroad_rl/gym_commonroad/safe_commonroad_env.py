@@ -426,22 +426,22 @@ class SafetyLayer(CommonroadEnv):
         self.safety_verifier = None
         self.in_or_entering_intersection = False
         new_low = np.concatenate([
-            self.observation_space.low.astype(np.float32),
+            self.observation_collector.observation_space.low.astype(np.float32),
             np.array([0.0], dtype=np.float32),  # distance_to_lane_end
             np.full(33, -1.0, dtype=np.float32),  # safe_actions
             np.array([-1.0], dtype=np.float32),  # final_priority
         ])
         new_high = np.concatenate([
-            self.observation_space.high.astype(np.float32),
+            self.observation_collector.observation_space.high.astype(np.float32),
             np.array([np.inf], dtype=np.float32),
             np.full(33, 1.0, dtype=np.float32),
             np.array([1.0], dtype=np.float32),
         ])
-        self.observation_space_safe = spaces.Box(low=new_low, high=new_high, dtype=self.observation_space.dtype)
+        self.observation_space_safe = spaces.Box(low=new_low, high=new_high, dtype=self.observation_collector.observation_space.dtype)
 
     def pack_observation(self, observation_dict):
         def pack_orig():
-            observation_vector = np.zeros(self.observation_space.shape)
+            observation_vector = np.zeros(self.observation_collector.observation_space.shape)
             index = 0
             for k in observation_dict.keys():
                 size = np.prod(observation_dict[k].shape)
