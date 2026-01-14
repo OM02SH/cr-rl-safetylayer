@@ -443,7 +443,7 @@ class SafetyLayer(CommonroadEnv):
         def pack_orig():
             observation_vector = np.zeros(self.observation_collector.observation_space.shape)
             index = 0
-            for k in self.observation_collector.observation_space.spaces.keys():
+            for k in observation_dict.keys():
                 print(k)
                 size = np.prod(observation_dict[k].shape)
                 observation_vector[index: index + size] = observation_dict[k].flat
