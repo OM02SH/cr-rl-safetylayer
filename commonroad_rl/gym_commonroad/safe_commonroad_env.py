@@ -39,7 +39,7 @@ class SafetyVerifier:
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
         self.safe_set : List[Tuple[List[Tuple[np.ndarray,np.ndarray,float,float,float]],Lanelet]] = []
-        self.precomputed_lane_polygons : Dict[CurvilinearCoordinateSystem ,np.ndarray ,np.ndarray] = precomputed_lane_polygons
+        self.precomputed_lane_polygons : Dict[int, CurvilinearCoordinateSystem ,np.ndarray ,np.ndarray] = precomputed_lane_polygons
         self.time_step = -1
         self.lane_width = 5
         self.ego_lanelet = None
@@ -159,19 +159,18 @@ class SafetyVerifier:
                 s_v_d.append((successor, get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successor))))
             min_ttc = math.inf
             closest_car = s_v_d[0][0]
-            for lane in s_v_d:
-                d_i = lane[2]
-                v_i = lane[1]
+            for lane_id, (v_i, d_i) in s_v_d:
                 relative_speed = self.v_max - v_i
+                if relative_speed <= 0: continue
                 ttc = d_i / relative_speed
                 if ttc < min_ttc:
                     min_ttc = ttc
-                    closest_car = lane[0]
+                    closest_car = lane_id
             v,d = 0, 0
-            for lane in s_v_d:
-                if lane[0] == closest_car:
-                    d = lane[2]
-                    v = lane[1]
+            for lane_id, (v_i, d_i) in s_v_d:
+                if lane_id == closest_car:
+                    d = d_i
+                    v = v_i
         return center[pt : len(center)], lane, preceding_v, v , d
 
     def get_lane_collision_free_areas(self, lane : Lanelet):
@@ -292,7 +291,7 @@ class SafetyVerifier:
                 # Changed from the original formula d_lim = r_min - sqrt(r_min^2 - l_front^2 + 0.5w),
                 # as the car shape will be handled in the action testing part with Shapely, replaced it
                 # with a lookahead distance equal to the velocity as we do this for each timestamp
-                d_lim = r_min - np.sqrt(max(r_min ** 2 - v/2 ** 2, 0))
+                d_lim = r_min - np.sqrt(max(r_min ** 2 - (v/2) ** 2, 0))
                 shrink_per_side = max(0, 2.5 - d_lim)
                 safe_states.append((cp[start], cp[end], v, shrink_per_side, shrink_per_side))
         return safe_states
@@ -397,7 +396,7 @@ class SafetyVerifier:
                             lane_polygon = Polygon(left_bound + right_bound[::-1])
                             if lane_polygon.contains(rect): return True
                             # allow intersections with the end and start of the lane for lane change
-                            return not(LineString(left_bound).intersects(rect), LineString(right_bound).intersects(rect))
+                            return not(LineString(left_bound).intersects(rect) or LineString(right_bound).intersects(rect))
                         if in_safe_space(lp, rp):
                             return True
         return False
@@ -426,8 +425,18 @@ class SafetyLayer(CommonroadEnv):
         self.precomputed_lane_polygons = {}
         self.safety_verifier = None
         self.in_or_entering_intersection = False
-        new_low = np.concatenate((self.observation_space.low, np.zeros(13)))
-        new_high = np.concatenate((self.observation_space.high, np.full(13, np.inf)))
+        new_low = np.concatenate([
+            self.observation_space.low.astype(np.float32),
+            np.array([0.0], dtype=np.float32),  # distance_to_lane_end
+            np.full(33, -1.0, dtype=np.float32),  # safe_actions
+            np.array([-1.0], dtype=np.float32),  # final_priority
+        ])
+        new_high = np.concatenate([
+            self.observation_space.high.astype(np.float32),
+            np.array([np.inf], dtype=np.float32),
+            np.full(33, 1.0, dtype=np.float32),
+            np.array([1.0], dtype=np.float32),
+        ])
         self.observation_space_safe = spaces.Box(low=new_low, high=new_high, dtype=self.observation_space.dtype)
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
@@ -438,9 +447,6 @@ class SafetyLayer(CommonroadEnv):
         ct ,_ ,_ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
         center_points = ct.reference_path_original()
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
-        print(ego_pos.shape)
-        print("type center_points : ", type(center_points))
-        for k in center_points: print(k)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
         initial_observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
@@ -543,7 +549,7 @@ class SafetyLayer(CommonroadEnv):
         reward_for_safe_action = 0
         in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_state)
         in_intersection = True if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys() else False
-        if self.safety_verifier.safe_action_check(action[1],action[0]):
+        if self.safety_verifier.safe_action_check(action[1],action[0], self.action_space):
             reward_for_safe_action = 1
         else:
             a,b =  self.find_safe_acceleration(action[1])
@@ -569,8 +575,8 @@ class SafetyLayer(CommonroadEnv):
         observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
         self.observation = observation
         self.time_step += 1
-        self.safety_verifier.safeDistanceSet()
         self.in_or_entering_intersection = self.intersection_check()
+        self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
         if self.in_or_entering_intersection:
             actions =self.intersection_safety()
         else:
