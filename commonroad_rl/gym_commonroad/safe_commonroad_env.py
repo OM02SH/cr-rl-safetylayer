@@ -432,7 +432,7 @@ class SafetyLayer(CommonroadEnv):
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
         ct ,_ ,_ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
-        center_points = ct.reference_path_original
+        center_points = ct.reference_path_original()
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
         print(ego_pos.shape)
         for k in center_points: print(k)
