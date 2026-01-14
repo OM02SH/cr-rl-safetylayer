@@ -261,7 +261,11 @@ class SafetyVerifier:
         txj += distance_to_add
         a_lat_max, a_lon_max, w, l, delta_react = (self.prop_ego["a_lat_max"], self.prop_ego["a_lon_max"],
                 self.prop_ego["ego_width"], self.prop_ego["ego_length"], self.prop_ego["delta_react"])
-        r_min = 1.0 / self.kappa(cp)
+        k = self.kappa(cp)
+        if k == 0:
+            r_min = math.inf
+        else:
+            r_min = 1.0 / k
         v_crit = np.sqrt(r_min * a_lat_max)
         # s >= s_i + Δ_safe(v, i)
         # s <= s_j - Δ_safe(v, j)
