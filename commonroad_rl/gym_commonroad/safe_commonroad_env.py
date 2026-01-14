@@ -450,7 +450,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        initial_observation["safe_actions"] = actions
+        initial_observation["safe_actions"] = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
         initial_observation["final_priority"] = np.array([self.final_priority], dtype=object)
         observation_vector = np.concatenate([v.flat for v in initial_observation.values()])
         return observation_vector, info
@@ -568,7 +568,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        observation["safe_actions"] = actions
+        observation["safe_actions"] =  np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
         observation["final_priority"] = np.array([self.final_priority], dtype= object)
         observation_vector = np.zeros(self.observation_space.shape)
         index = 0
@@ -679,11 +679,11 @@ class SafetyLayer(CommonroadEnv):
         fcl_input = self.compute_steering_velocity(self.observation_collector.ego_lanelet.center_vertices)
         if self.observation_collector.ego_lanelet.adj_left_same_direction:
             if self.observation_collector.ego_lanelet.adj_right_same_direction:
-                steering_velocities = np.linspace(-1, 1, 11) # left, current and right
+                steering_velocities = np.linspace(-0.8, 0.8, 11) # left, current and right
             else:
-                steering_velocities = np.linspace(fcl_input - 0.1, 1, 11) # left and current
+                steering_velocities = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
         elif self.observation_collector.ego_lanelet.adj_right_same_direction:
-            steering_velocities = np.linspace(-1, fcl_input + 0.1, 11) # current and right
+            steering_velocities = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
         else:
             steering_velocities = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for sv in steering_velocities:
