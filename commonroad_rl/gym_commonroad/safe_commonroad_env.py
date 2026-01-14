@@ -439,6 +439,29 @@ class SafetyLayer(CommonroadEnv):
         ])
         self.observation_space_safe = spaces.Box(low=new_low, high=new_high, dtype=self.observation_space.dtype)
 
+    def pack_observation(self, observation_dict):
+        def pack_orig():
+            observation_vector = np.zeros(self.observation_space.shape)
+            index = 0
+            for k in observation_dict.keys():
+                size = np.prod(observation_dict[k].shape)
+                observation_vector[index: index + size] = observation_dict[k].flat
+                index += size
+            return observation_vector
+        vec = np.zeros(self.observation_space_safe.shape, dtype=np.float32)
+        idx = 0
+        base = pack_orig()
+        vec[idx:idx + base.size] = base
+        idx += base.size
+        vec[idx] = float(self.observation["distance_to_lane_end"])
+        idx += 1
+        sa = self.observation["safe_actions"].reshape(-1)
+        vec[idx:idx + sa.size] = sa
+        idx += sa.size
+        vec[idx] = float(self.observation["final_priority"])
+        return vec
+
+
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
@@ -449,8 +472,8 @@ class SafetyLayer(CommonroadEnv):
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.safety_verifier = SafetyVerifier(self.scenario,self.prop_ego,self.precomputed_lane_polygons)
-        initial_observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
         self.observation = initial_observation
+        self.observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
         self.in_or_entering_intersection = self.intersection_check()
         self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
         self.pre_intersection_lanes = None
@@ -460,14 +483,9 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        initial_observation["safe_actions"] = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
-        initial_observation["final_priority"] = np.array([self.final_priority], dtype=object)
-        observation_vector = np.zeros(self.observation_space_safe.shape)
-        index = 0
-        for k in initial_observation.keys():
-            size = np.prod(initial_observation[k].shape)
-            observation_vector[index: index + size] = initial_observation[k].flat
-            index += size
+        self.observation["safe_actions"] = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
+        self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
+        observation_vector = self.pack_observation(initial_observation)
         return observation_vector, info
 
     def compute_lane_sides_and_conflict(self):
