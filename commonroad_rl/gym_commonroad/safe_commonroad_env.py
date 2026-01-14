@@ -177,7 +177,7 @@ class SafetyVerifier:
 
     def get_lane_collision_free_areas(self, lane : Lanelet):
         C = []
-        center = self.dense_lanes[lane.lanelet_id]
+        center = self.dense_lanes[lane.lanelet_id][1]
         obs = lane.get_obstacles(self.scenario.obstacles, self.time_step)
         l_id = None
         r_id = None
@@ -188,34 +188,29 @@ class SafetyVerifier:
         # empty lane with no vehicle entering or exiting it
         if len(obs) == 0:
             print("Empty lane")
-            return [(center, lane, 0, self.v_max, 0)]
+            return [(center, lane, 0.0, self.v_max, 0.0)]
         i = 0
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
         obs_state = obs[i].state_at_time(self.time_step)
         pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
         while pts is None:
             i += 1
-            print("obs: ", obs)
-            print(obs[0])
-            print(lane.left_vertices)
-            print(lane.center_vertices)
-            print(lane.right_vertices)
             if len(obs) == 1:
                 print("Empty lane")
-                return [(center, lane, 0, self.v_max, 0)]
+                return [(center, lane, 0.0, self.v_max, 0.0)]
             obs_state = obs[i].state_at_time(self.time_step)
             pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
         preceding_v = obs_state.velocity
         if len(pts) == 1:   pt = pts[0]
         else:
             cps = center[0 : pts[0] + 1]
-            C.append((cps,lane, 0, preceding_v, 0)) # add first collision free area
+            C.append((cps,lane, 0.0, preceding_v, 0.0)) # add first collision free area
             pt = pts[1]
         for i in range(len(obs) - 2):
             obs_state = obs[i + 1].state_at_time(self.time_step)
             pts = self.obs_start_end_index(obs[i + 1], lane.lanelet_id)
             cps = center[pt : pts[0] + 1]
-            C.append((cps, lane, preceding_v, obs_state.velocity, 0))  # add middle collision free areas
+            C.append((cps, lane, preceding_v, obs_state.velocity, 0.0))  # add middle collision free areas
             if len(pts) == 2:
                 pt = pts[1]
             preceding_v = obs_state.velocity
