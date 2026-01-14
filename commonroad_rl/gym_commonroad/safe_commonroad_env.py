@@ -254,7 +254,7 @@ class SafetyVerifier:
                - d -> The Area to leave on edges for safe bounds in the lane
         """
         ct,_,_ = self.precomputed_lane_polygons[l_id]
-        tc = ct.reference_path().tolist()
+        tc = ct.reference_path()
         # for c in cp:    tc.append(ct.convert_to_curvilinear_coords(*c))
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
