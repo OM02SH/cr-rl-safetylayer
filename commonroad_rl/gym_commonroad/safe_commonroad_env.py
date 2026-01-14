@@ -508,7 +508,6 @@ class SafetyLayer(CommonroadEnv):
                 return center
             center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
                                 (l.center_vertices,l.left_vertices,l.right_vertices), 0.1)
-
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
             x,y = 0,0
@@ -570,7 +569,7 @@ class SafetyLayer(CommonroadEnv):
             self.final_priority = -1
             actions = self.lane_safety()
         observation["safe_actions"] = actions
-        observation["final_priority"] = self.final_priority
+        observation["final_priority"] = np.array([self.final_priority], dtype= object)
         observation_vector = np.zeros(self.observation_space.shape)
         index = 0
         for k in observation.keys():
