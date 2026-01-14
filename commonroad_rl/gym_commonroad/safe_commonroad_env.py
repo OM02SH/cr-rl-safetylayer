@@ -187,7 +187,8 @@ class SafetyVerifier:
             r_id = lane.adj_right
         # empty lane with no vehicle entering or exiting it
         if len(obs) == 0:
-            return [(center, lane, center[0], 0, center[len(center)-1], self.v_max, 0)]
+            print("Empty lane")
+            return [(center, lane, 0, self.v_max, 0)]
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
         obs_state = obs[0].state_at_time(self.time_step)
         pts = self.obs_start_end_index(obs[0], left, center, right)
@@ -412,7 +413,6 @@ class SafetyLayer(CommonroadEnv):
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
         self.in_or_entering_intersection = self.intersection_check()
-        print(self.scenario.scenario_id)
         self.safe_set = self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
         self.pre_intersection_lanes = None
         if self.in_or_entering_intersection:
