@@ -245,7 +245,7 @@ class SafetyVerifier:
                - v -> Velocities of the ego vehicle for each center
                - d -> The Area to leave on edges for safe bounds in the lane
         """
-        ct,_,_ = self.precomputed_lane_polygons(l_id)
+        ct,_,_ = self.precomputed_lane_polygons[l_id]
         tc = []
         for c in cp:    tc.append(ct.convert_to_curvilinear_coords(*c))
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
@@ -366,7 +366,7 @@ class SafetyVerifier:
         rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
         rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
         rect = translate(rect, xoff=p[0], yoff=p[1])
-        for l in self.reachable_lanes:
+        for l in self.get_reachable_lanes():
             ct,lp,rp = self.precomputed_lane_polygons[l.lanelet_id]
             for s in self.safe_set:
                 _, _, v, _, _, lane = s
