@@ -115,11 +115,11 @@ class SafetyVerifier:
         obs_state = obs.state_at_time(self.time_step)
         shape = obs.occupancy_at_time(self.time_step).shape
         c_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1], obs_state.orientation,
-                                                      shape.length, shape.width, center)
+                                                      shape.length, shape.width, resample_polyline_with_distance(center,0.1))
         l_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1],
-                                                      obs_state.orientation,shape.length, shape.width, left)
+                                                      obs_state.orientation,shape.length, shape.width, resample_polyline_with_distance(left,0.1))
         r_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1],
-                                                     obs_state.orientation,shape.length, shape.width, right)
+                                                     obs_state.orientation,shape.length, shape.width, resample_polyline_with_distance(right,0.1))
         pts = []
         for k in (c_pts, l_pts, r_pts):
             if k is not None:
@@ -191,10 +191,9 @@ class SafetyVerifier:
             return [(center, lane, 0, self.v_max, 0)]
         i = 0
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
-
         obs_state = obs[i].state_at_time(self.time_step)
         pts = self.obs_start_end_index(obs[i], left, center, right)
-        if pts is None:
+        while pts is None:
             i += 1
             print("obs: ", obs)
             print(obs[0])
