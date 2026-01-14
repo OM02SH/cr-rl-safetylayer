@@ -660,13 +660,13 @@ class SafetyLayer(CommonroadEnv):
         low, high = -1, 1
         while high - low > 1e-5:
             mid = (low + high) / 2
-            if self.safety_verifier.safe_action_check(mid, sv):   high = mid
+            if self.safety_verifier.safe_action_check(mid, sv, self.ego_action):   high = mid
             else:   low = mid
         safe_min = high
         low, high = -1, 1
         while high - low > 1e-5:
             mid = (low + high) / 2
-            if self.safety_verifier.safe_action_check(mid, sv):   low = mid
+            if self.safety_verifier.safe_action_check(mid, sv, self.ego_action):   low = mid
             else:   high = mid
         safe_max = low
         return safe_min, safe_max
