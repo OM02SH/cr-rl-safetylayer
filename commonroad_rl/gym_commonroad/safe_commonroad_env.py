@@ -228,9 +228,9 @@ class SafetyVerifier:
             except CartesianProjectionDomainError:
                 cp = ct.reference_path_original()
                 if math.dist(pos,cp[0]) > math.dist(pos,cp[1]):
-                    pos_inlane = ct.convert_to_curvilinear_coords(cp[1])
+                    pos_inlane = ct.convert_to_curvilinear_coords(*cp[1])
                 else:
-                    pos_inlane = ct.convert_to_curvilinear_coords(cp[0])
+                    pos_inlane = ct.convert_to_curvilinear_coords(*cp[0])
             obs_with_center.append((ob, pos_inlane[0]))
         obs_with_center.sort(key=lambda k: k[1])
         return list(obs for obs, obs_center in obs_with_center)
