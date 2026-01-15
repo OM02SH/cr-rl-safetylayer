@@ -6,7 +6,7 @@ from typing import List, Tuple, Optional, Union, Dict
 from gymnasium import spaces
 from shapely.geometry import Polygon, LineString
 from shapely.affinity import rotate, translate
-
+from commonroad_rl.gym_commonroad.action.action import Action
 from commonroad.scenario.lanelet import Lanelet
 from commonroad.scenario.scenario import Scenario
 from commonroad.planning.planning_problem import PlanningProblem
@@ -362,7 +362,7 @@ class SafetyVerifier:
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
 
-    def safe_action_check(self, a, sv, ego_action):
+    def safe_action_check(self, a, sv, ego_action : Action):
         curr_vehicle: ContinuousVehicle = ego_action.vehicle
         new_vehicle_state = curr_vehicle.get_new_state(ego_action.rescale_action(np.array([a, sv])), ego_action.action_base)
         p = new_vehicle_state.position
@@ -472,6 +472,7 @@ class SafetyLayer(CommonroadEnv):
         elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
+        for k in self.observation.keys():   print(k, " : ", self.observation[k])
         observation_vector = self.pack_observation(initial_observation)
         return observation_vector, info
 
@@ -559,7 +560,7 @@ class SafetyLayer(CommonroadEnv):
         reward_for_safe_action = 0
         in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         in_intersection = True if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys() else False
-        if self.safety_verifier.safe_action_check(action[1],action[0], self.action_space):
+        if self.safety_verifier.safe_action_check(action[1],action[0], self.ego_action):
             reward_for_safe_action = 1
         else:
             a,b =  self.find_safe_acceleration(action[1])
@@ -599,6 +600,7 @@ class SafetyLayer(CommonroadEnv):
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype= object)
         observation_vector = self.pack_observation(observation)
+        for k in self.observation.keys():   print(k, " : ", self.observation[k])
         return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
