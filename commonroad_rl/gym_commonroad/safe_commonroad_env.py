@@ -362,6 +362,7 @@ class SafetyVerifier:
                         rs.extend(k)
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
+        print(S)
 
     def safe_action_check(self, a, sv, ego_action : Action):
         curr_vehicle: ContinuousVehicle = ego_action.vehicle
@@ -581,7 +582,7 @@ class SafetyLayer(CommonroadEnv):
                 reward += self.safe_reward(action, in_intersection, in_conflict)
         else:   reward -= 800
         ct, _, _ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
-        center_points = ct.reference_path_original
+        center_points = ct.reference_path_original()
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1, 2)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.observation = observation
