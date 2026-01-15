@@ -104,21 +104,21 @@ env_configs:
     lane_rect_sensor_range_width: 7.
 
     # Circular
-    observe_lane_circ_surrounding: True
+    observe_lane_circ_surrounding: False
     lane_circ_sensor_range_radius: 500.
 
     # Traffic rule related:
     observe_relative_priority: False
 
     ## Lidar-based elliptical surrounding observation flags and settings
-    observe_lidar_circle_surrounding: False
+    observe_lidar_circle_surrounding: True
     lidar_circle_num_beams: 20
     lidar_sensor_radius: 50.
 
     # Intersection-based observation of velocities and distances
     observe_intersection_distances: False #only selectable with inD data
     observe_intersection_velocities: False #only selectable with inD data
-    observe_ego_distance_intersection: False #only selectable with inD data
+    observe_ego_distance_intersection: True #only selectable with inD data
 
   traffic_sign_configs:
     observe_stop_sign: False
