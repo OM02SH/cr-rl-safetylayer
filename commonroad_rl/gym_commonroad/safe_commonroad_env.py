@@ -39,7 +39,7 @@ class SafetyVerifier:
         self.v_max = 45
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
-        self.safe_set : List[Tuple[List[Tuple[np.ndarray,np.ndarray,float,float,float]],Lanelet]] = []
+        self.safe_set : List[Tuple[List[Tuple[int,int,float,float,float]],Lanelet]] = []
         self.precomputed_lane_polygons : Dict[int, CurvilinearCoordinateSystem ,np.ndarray ,np.ndarray] = precomputed_lane_polygons
         self.time_step = -1
         self.lane_width = 5
@@ -276,8 +276,8 @@ class SafetyVerifier:
         def zeta_succeeding(v, v_i, a_lon_max, v_crit, delta_react):
             return (v_i ** 2) / (2 * abs(a_lon_max)) - (v ** 2) / (2 * abs(a_lon(v,a_lon_max,v_crit))) + delta_react * v_i
         for v in vs:
-            s_min_final = max(txi, max(zeta_succeeding(v,v_i,a_lon_max,v_crit,delta_react), 0))
-            s_max_final = min(txj, max(zeta_preceding(v,v_j,a_lon_max,v_crit,delta_react), 0))
+            s_min_final = max(txi + zeta_succeeding(v,v_i,a_lon_max,v_crit,delta_react), 0)
+            s_max_final = txj - zeta_preceding(v,v_j,a_lon_max,v_crit,delta_react)
             if s_min_final <= s_max_final:
                 start = np.argmin(np.abs(s_centers - s_min_final))
                 end = np.argmin(np.abs(s_centers - s_max_final))
@@ -286,28 +286,32 @@ class SafetyVerifier:
                 # with a lookahead distance equal to the velocity as we do this for each timestamp
                 d_lim = r_min - np.sqrt(max(r_min ** 2 - (v/2) ** 2, 0))
                 shrink_per_side = max(0, 2.5 - d_lim)
-                safe_states.append((cp[start], cp[end], v, shrink_per_side, shrink_per_side))
+                lane_half_width = self.lane_width / 2
+                shrink_per_side = np.clip(shrink_per_side, 0, lane_half_width - 0.1)
+                if k < 1e-6 : shrink_per_side = 0
+                safe_states.append((start, end, v, shrink_per_side, shrink_per_side))
         return safe_states
 
-    def union_safe_set(self, ll: Lanelet, safe_set_list_left, rl : Lanelet, safe_set_list_right):
+    def union_safe_set(self, ll: Lanelet, safe_set_list_left : List[Tuple[int,int,float,float,float]]
+                            , rl : Lanelet, safe_set_list_right :List[Tuple[int,int,float,float,float]]):
         (ct, _, _) = self.precomputed_lane_polygons[ll.lanelet_id]
         nls = []
         nrs = []
         for s in safe_set_list_left:
             c1, c2, lv, dl, _ = s
-            l_start = ct.convert_to_curvilinear_coords(c1[0], c1[1])
-            l_end = ct.convert_to_curvilinear_coords(c2[0], c2[1])
+            _, lcp, _ = self.dense_lanes[ll.lanelet_id]
+            l_start, _ = ct.convert_to_curvilinear_coords(lcp[c1])
+            l_end, _ = ct.convert_to_curvilinear_coords(lcp[c2])
             for c in safe_set_list_right:
                 c1, c2, rv, _, dr = c
-                r_start = ct.convert_to_curvilinear_coords(c1[0], c1[1])
-                r_end = ct.convert_to_curvilinear_coords(c2[0], c2[1])
+                _, rcp, _ = self.dense_lanes[rl.lanelet_id]
+                r_start, _ = ct.convert_to_curvilinear_coords(rcp[c1])
+                r_end, _ = ct.convert_to_curvilinear_coords(rcp[c2])
                 start = max(l_start, r_start)
                 end = min(l_end, r_end)
                 if start <= end:
-                    nls.append((ct.convert_to_cartesian_coords(start,0), ct.convert_to_cartesian_coords(end,0), lv, dl, -4))
-                    nrs.append((ct.convert_to_cartesian_coords
-                            (start, self.lane_width), ct.convert_to_cartesian_coords(end,self.lane_width), rv, -4, dr))
-
+                    nls.append((start, end, lv, dl, -4))
+                    nrs.append((start, end, rv, -4, dr))
         return [(nls,ll), (nrs,rl)]
 
     def safeDistanceSet(self, ego_lanelet : Lanelet, in_or_entering_intersection):
