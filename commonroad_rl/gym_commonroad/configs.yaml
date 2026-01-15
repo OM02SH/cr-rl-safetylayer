@@ -176,7 +176,7 @@ env_configs:
 
       # Safe driving
       reward_reverse_driving: 0.
-      reward_safe_distance_coef: -1.
+      reward_safe_distance_coef: 0.
 
       # Comfort
       reward_jerk_long: 0. #0.05
