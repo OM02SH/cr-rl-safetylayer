@@ -20,6 +20,7 @@ from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 from commonroad.geometry.polyline_util import resample_polyline_with_distance
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
+
 def traveled_distance(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
@@ -377,8 +378,7 @@ class SafetyVerifier:
                 k, lane = s
                 if lane.lanelet_id == l.lanelet_id:
                     for start, end, v, dl, dr in k:
-                        if not v - 0.1 <= nv <= v + 0.1:
-                            continue
+                        if not v - 0.1 <= nv <= v + 0.1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
@@ -389,8 +389,8 @@ class SafetyVerifier:
                             if lane_polygon.contains(rect): return True
                             # allow intersections with the end and start of the lane for lane change
                             return not(LineString(left_bound).intersects(rect) or LineString(right_bound).intersects(rect))
-                        if in_safe_space(lp, rp):
-                            return True
+                        print("Tested acceleration with suitable v  : " , a)
+                        if in_safe_space(lp, rp):   return True
         return False
 
 
@@ -682,6 +682,8 @@ class SafetyLayer(CommonroadEnv):
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
         low, high = -1, 1
+        print("action : " , self.ego_action)
+        print("steering velocity : ", sv)
         while high - low > 1e-5:
             mid = (low + high) / 2
             if self.safety_verifier.safe_action_check(mid, sv, self.ego_action):   high = mid
