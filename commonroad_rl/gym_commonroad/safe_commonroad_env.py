@@ -249,6 +249,7 @@ class SafetyVerifier:
         """
         ct,_,_ = self.precomputed_lane_polygons[l_id]
         tc = ct.reference_path()
+        print(tc)
         # for c in cp:    tc.append(ct.convert_to_curvilinear_coords(*c))
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
@@ -752,10 +753,10 @@ class SafetyLayer(CommonroadEnv):
                 1 --> yield
                 0 --> priority
         """
-        def dir_priority(incoming_lanes: List[Lanelet]):
+        def dir_priority(incoming_lanes):
             intersection_lanes_obs = []
             for l in incoming_lanes:
-                obs = l.get_obstacles(self.scenario.obstacles, self.time_step)
+                obs = self.scenario.lanelet_network.find_lanelet_by_id(l).get_obstacles(self.scenario.obstacles, self.time_step)
                 obs = self.safety_verifier.sort_obstacles_in_lane(l.lanelet_id, obs)
                 if not obs: continue
                 intersection_lanes_obs.append((l, obs[-1]))
