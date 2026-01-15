@@ -434,12 +434,7 @@ class SafetyLayer(CommonroadEnv):
                 index += size
             return observation_vector
         base = pack_orig()
-        sa_list = []
-        for elem in self.observation["safe_actions"]:
-            sv, a_tuple = elem
-            if a_tuple is None: a_tuple = (0, 0)
-            sa_list.extend([sv, a_tuple[0], a_tuple[1]])
-        sa = np.array(sa_list, dtype=np.float32)
+        sa = self.observation["safe_actions"]
         vec = np.zeros(sa.size + 2 + base.size, dtype=np.float32)
         idx = 0
         vec[idx:idx + base.size] = base
@@ -473,8 +468,14 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        if actions.size > 11:   actions = actions[:11]
-        elif actions.size < 11:   actions = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=(0,(0,0)))
+        sa_list = []
+        for elem in actions:
+            sv, a_tuple = elem
+            if a_tuple is None: a_tuple = (0, 0)
+            sa_list.extend([sv, a_tuple[0], a_tuple[1]])
+        sa = np.array(sa_list, dtype=np.float32)
+        if sa.size > 33:   actions = sa[:33]
+        elif sa.size < 33:   actions = np.pad(sa, (0, 33 - sa.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
         observation_vector = self.pack_observation(initial_observation)
