@@ -288,7 +288,7 @@ class SafetyVerifier:
                 shrink_per_side = max(0, 2.5 - d_lim)
                 lane_half_width = self.lane_width / 2
                 shrink_per_side = np.clip(shrink_per_side, 0, lane_half_width - 0.1)
-                if k < 1e-6 : shrink_per_side = 0
+                shrink_per_side = 0
                 safe_states.append((start, end, v, shrink_per_side, shrink_per_side))
         return safe_states
 
