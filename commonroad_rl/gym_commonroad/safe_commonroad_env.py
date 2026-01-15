@@ -393,6 +393,8 @@ class SafetyVerifier:
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
                             for i in range(len(left_bound)):
+                                print(type(left_bound[i]))
+                                print(type(right_bound[i]))
                                 left_bound[i] = np.array(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl))
                                 right_bound[i] = np.array(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] + dr))
                             lane_polygon = Polygon(left_bound + right_bound[::-1])
