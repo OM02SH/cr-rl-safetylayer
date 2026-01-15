@@ -428,7 +428,6 @@ class SafetyLayer(CommonroadEnv):
             observation_vector = np.zeros(self.observation_collector.observation_space.shape)
             index = 0
             for k in observation_dict.keys():
-                print(k)
                 size = np.prod(observation_dict[k].shape)
                 observation_vector[index: index + size] = observation_dict[k].flat
                 index += size
@@ -712,8 +711,8 @@ class SafetyLayer(CommonroadEnv):
             steering_velocities = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for sv in steering_velocities:
             safe_min, safe_max = self.find_safe_acceleration(sv)
-            if safe_min <= safe_max:    At_safe_l.append((sv, safe_min, safe_max))
-            else: At_safe_l.append((sv,0,0))
+            if safe_min <= safe_max:    At_safe_l.extend([sv, safe_min, safe_max])
+            else: At_safe_l.extend([sv,0,0])
         return np.array(At_safe_l, dtype=object)
 
     def priority_condition(self, lane : Lanelet,obstacle : Obstacle, D_m=30.0, T_a=3.0):
@@ -771,7 +770,7 @@ class SafetyLayer(CommonroadEnv):
         """
             Returns an array of safe actions each as a tuple of (sv,(a_min,a_max))
         """
-        At_safe_in : List[Tuple[float, float, float]] = []
+        At_safe_in : List[float] = []
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
         if curr_index == len(route_ids) - 1:
@@ -793,9 +792,9 @@ class SafetyLayer(CommonroadEnv):
         for sv in steering_velocities:
             safe_min, safe_max = self.find_safe_acceleration(sv)
             if safe_min <= safe_max:
-                At_safe_in.append((sv, safe_min, safe_max))
+                At_safe_in.extend([sv, safe_min, safe_max])
             else:
-                At_safe_in.append((sv , 0, 0))
+                At_safe_in.extend([sv , 0, 0])
         return np.array(At_safe_in, dtype=object)
 
     @property
