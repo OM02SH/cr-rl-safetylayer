@@ -362,7 +362,10 @@ class SafetyVerifier:
                         rs.extend(k)
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
+        print("Printing Safe sets : ")
+        print("--------------------------------------------------------------------------------------------------------------")
         print(S)
+        print("--------------------------------------------------------------------------------------------------------------")
 
     def safe_action_check(self, a, sv, ego_action : Action):
         curr_vehicle: ContinuousVehicle = ego_action.vehicle
@@ -429,7 +432,7 @@ class SafetyLayer(CommonroadEnv):
             observation_vector = np.zeros(self.observation_collector.observation_space.shape)
             index = 0
             for k in observation_dict.keys():
-                size = np.prod(observation_dict[k].shape)
+                size = observation_dict[k].size
                 observation_vector[index: index + size] = observation_dict[k].flat
                 index += size
             return observation_vector
@@ -445,7 +448,6 @@ class SafetyLayer(CommonroadEnv):
         idx += sa.size
         vec[idx] = float(self.observation["final_priority"])
         return vec
-
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
@@ -600,8 +602,8 @@ class SafetyLayer(CommonroadEnv):
         elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype= object)
-        observation_vector = self.pack_observation(observation)
         for k in self.observation.keys():   print(k, " : ", self.observation[k])
+        observation_vector = self.pack_observation(observation)
         return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
@@ -779,6 +781,7 @@ class SafetyLayer(CommonroadEnv):
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
         if curr_index == len(route_ids) - 1:
+            print("returned empty list")
             return np.array([]) # simulation is done no next route
         nxt_id = route_ids[curr_index + 1]
         nxt_lane = self.scenario.lanelet_network.find_lanelet_by_id(nxt_id)
