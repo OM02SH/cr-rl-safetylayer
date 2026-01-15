@@ -474,7 +474,7 @@ class SafetyLayer(CommonroadEnv):
             self.final_priority = -1
             actions = self.lane_safety()
         if actions.size > 11:   actions = actions[:11]
-        elif actions.size < 11:   actions = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
+        elif actions.size < 11:   actions = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=(0,(0,0)))
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
         observation_vector = self.pack_observation(initial_observation)
@@ -599,7 +599,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        self.observation["safe_actions"] =  np.pad(actions, max(0, 11 - actions.size), mode='constant', constant_values=0)
+        self.observation["safe_actions"] =  np.pad(actions, max(0, 11 - actions.size), mode='constant', constant_values=(0,(0,0)))
         self.observation["final_priority"] = np.array([self.final_priority], dtype= object)
         observation_vector = self.pack_observation(observation)
         return observation_vector, reward, terminated, truncated, info
