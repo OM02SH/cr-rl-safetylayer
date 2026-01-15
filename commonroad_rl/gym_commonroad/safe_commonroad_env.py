@@ -301,13 +301,13 @@ class SafetyVerifier:
         for s in safe_set_list_left:
             c1, c2, lv, dl, _ = s
             _, lcp, _ = self.dense_lanes[ll.lanelet_id]
-            l_start, _ = ct.convert_to_curvilinear_coords(lcp[c1])
-            l_end, _ = ct.convert_to_curvilinear_coords(lcp[c2])
+            l_start, _ = ct.convert_to_curvilinear_coords(lcp[c1][0],lcp[c1][1])
+            l_end, _ = ct.convert_to_curvilinear_coords(lcp[c2][0],lcp[c2][1])
             for c in safe_set_list_right:
                 c1, c2, rv, _, dr = c
                 _, rcp, _ = self.dense_lanes[rl.lanelet_id]
-                r_start, _ = ct.convert_to_curvilinear_coords(rcp[c1])
-                r_end, _ = ct.convert_to_curvilinear_coords(rcp[c2])
+                r_start, _ = ct.convert_to_curvilinear_coords(rcp[c1][0],rcp[c1][1])
+                r_end, _ = ct.convert_to_curvilinear_coords(rcp[c2][0],rcp[c2][1])
                 start = max(l_start, r_start)
                 end = min(l_end, r_end)
                 if start <= end:
