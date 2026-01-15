@@ -447,6 +447,7 @@ class SafetyLayer(CommonroadEnv):
         sa_list = []
         for elem in self.observation["safe_actions"]:
             sv, a_tuple = elem
+            if a_tuple is None: a_tuple = (0, 0)
             sa_list.extend([sv, a_tuple[0], a_tuple[1]])
         sa = np.array(sa_list, dtype=np.float32)
         vec = np.zeros(sa.size + 2 + base.size, dtype=np.float32)
