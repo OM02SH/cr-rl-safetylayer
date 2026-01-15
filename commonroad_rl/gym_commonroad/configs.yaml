@@ -151,7 +151,7 @@ env_configs:
     render_follow_ego: False
     render_range: [100., 15.]
 
-  reward_type: hybrid_reward # hybrid_reward # p: sparse_reward
+  reward_type: sparse_reward # hybrid_reward # p: sparse_reward
   # Reward settings
 
   # HYBRID REWARD
