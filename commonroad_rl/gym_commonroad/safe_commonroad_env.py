@@ -280,7 +280,7 @@ class SafetyVerifier:
         for v in vs:
             s_min_final = max(txi + zeta_succeeding(v,v_i,a_lon_max,v_crit,delta_react), 0)
             s_max_final = txj - zeta_preceding(v,v_j,a_lon_max,v_crit,delta_react)
-            if s_min_final <= s_max_final:
+            if s_min_final < s_max_final:
                 start = np.argmin(np.abs(s_centers - s_min_final))
                 end = np.argmin(np.abs(s_centers - s_max_final))
                 # Changed from the original formula d_lim = r_min - sqrt(r_min^2 - l_front^2 + 0.5w),
@@ -388,7 +388,7 @@ class SafetyVerifier:
                 k, lane = s
                 if lane.lanelet_id == l.lanelet_id:
                     for start, end, v, dl, dr in k:
-                        if not v - 0.1 <= nv <= v + 0.1:    continue
+                        if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
