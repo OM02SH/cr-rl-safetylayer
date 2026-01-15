@@ -247,6 +247,7 @@ class SafetyVerifier:
                - v -> Velocities of the ego vehicle for each center
                - d -> The Area to leave on edges for safe bounds in the lane
         """
+        print(xi , "   ",yi, "   ",v_i, "   ",xj, "   ",yj, "   ",v_j)
         ct,_,_ = self.precomputed_lane_polygons[l_id]
         tc = ct.reference_path()
         print(tc)
