@@ -557,7 +557,7 @@ class SafetyLayer(CommonroadEnv):
 
     def step(self, action: Union[np.ndarray, State]) -> Tuple[np.ndarray, float, bool, dict]:
         reward_for_safe_action = 0
-        in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_state)
+        in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         in_intersection = True if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys() else False
         if self.safety_verifier.safe_action_check(action[1],action[0], self.action_space):
             reward_for_safe_action = 1
@@ -602,7 +602,7 @@ class SafetyLayer(CommonroadEnv):
         return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
-        in_conflict_after = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_state)
+        in_conflict_after = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         reward_for_exiting_conflict_zone = 0
         penalty_for_slowing_down_in_conflict_zone = 0
         priority_non_compliance = 0
