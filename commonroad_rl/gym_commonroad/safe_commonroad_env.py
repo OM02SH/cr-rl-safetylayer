@@ -418,20 +418,10 @@ class SafetyLayer(CommonroadEnv):
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
         self.safety_verifier = None
         self.in_or_entering_intersection = False
-        self.new_low = np.concatenate([
-            self.observation_collector.observation_space.low.astype(np.float32),
-            np.array([0.0], dtype=np.float32),  # distance_to_lane_end
-            np.full(33, -1.0, dtype=np.float32),  # safe_actions
-            np.array([-1.0], dtype=np.float32),  # final_priority
-            np.full(23, -1.0, dtype=np.float32)
-        ])
-        self.new_high = np.concatenate([
-            self.observation_collector.observation_space.high.astype(np.float32),
-            np.array([np.inf], dtype=np.float32),
-            np.full(33, 1.0, dtype=np.float32),
-            np.array([1.0], dtype=np.float32),
-            np.full(23, 1.0, dtype=np.float32)
-        ])
+        self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float32),
+                                        np.full(35, -1.0, dtype=np.float32)])
+        self.new_high = np.concatenate([self.observation_collector.observation_space.high.astype(np.float32),
+                                        np.full(35, 1.0, dtype=np.float32)])
 
     def pack_observation(self, observation_dict):
         def pack_orig():
@@ -609,7 +599,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        self.observation["safe_actions"] =  np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
+        self.observation["safe_actions"] =  np.pad(actions, max(0, 11 - actions.size), mode='constant', constant_values=0)
         self.observation["final_priority"] = np.array([self.final_priority], dtype= object)
         observation_vector = self.pack_observation(observation)
         return observation_vector, reward, terminated, truncated, info
