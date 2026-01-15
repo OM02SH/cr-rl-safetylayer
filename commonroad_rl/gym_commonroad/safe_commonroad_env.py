@@ -438,8 +438,11 @@ class SafetyLayer(CommonroadEnv):
             observation_vector = np.zeros(self.observation_collector.observation_space.shape)
             index = 0
             for k in observation_dict.keys():
-                size = observation_dict[k].size
-                observation_vector[index: index + size] = observation_dict[k].flat
+                size = np.prod(self.observation_dict[k].shape)
+                try:
+                    observation_vector[index: index + size] = observation_dict[k].flat
+                except ValueError:
+                    print(size , "   ", index, "   " , k)
                 index += size
             return observation_vector
         base = pack_orig()
