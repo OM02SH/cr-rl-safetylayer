@@ -283,7 +283,8 @@ class SafetyVerifier:
             if s_min_final < s_max_final:
                 start = np.argmin(np.abs(s_centers - s_min_final))
                 end = np.argmin(np.abs(s_centers - s_max_final))
-                if(start == end): continue
+                print(s_centers)
+                if start == end: continue
                 # Changed from the original formula d_lim = r_min - sqrt(r_min^2 - l_front^2 + 0.5w),
                 # as the car shape will be handled in the action testing part with Shapely, replaced it
                 # with a lookahead distance equal to the velocity as we do this for each timestamp
@@ -292,7 +293,7 @@ class SafetyVerifier:
                 lane_half_width = self.lane_width / 2
                 shrink_per_side = np.clip(shrink_per_side, 0, lane_half_width - 0.1)
                 shrink_per_side = 0
-                safe_states.append((start, end, v, shrink_per_side, shrink_per_side))
+                safe_states.append((min(start,end), max(start,end), v, shrink_per_side, shrink_per_side))
         return safe_states
 
     def union_safe_set(self, ll: Lanelet, safe_set_list_left : List[Tuple[int,int,float,float,float]]
@@ -810,7 +811,7 @@ class SafetyLayer(CommonroadEnv):
                 obs = self.scenario.lanelet_network.find_lanelet_by_id(l).get_obstacles(self.scenario.obstacles, self.time_step)
                 obs = self.safety_verifier.sort_obstacles_in_lane(l, obs)
                 if not obs: continue
-                intersection_lanes_obs.append((l, obs[-1]))
+                intersection_lanes_obs.append((self.scenario.lanelet_network.find_lanelet_by_id(l), obs[-1]))
             for k in intersection_lanes_obs:
                 if self.priority_condition(*k):
                     return True
@@ -818,7 +819,7 @@ class SafetyLayer(CommonroadEnv):
         self.final_priority = 1 if dir_priority(pre_intersection_lanes[lane.lanelet_id]) else 0
 
     def get_per_intersection_lanes_update_priority(self, lane : Lanelet):
-        pre_intersection_lanes: defaultdict[int, list[Lanelet]] = defaultdict(list)
+        pre_intersection_lanes: defaultdict[int, list[int]] = defaultdict(list)
         for k,v in self.conflict_lanes.items():
             if k == lane.lanelet_id:
                 for conflict_lane,right in v:
