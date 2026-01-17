@@ -689,6 +689,8 @@ class SafetyLayer(CommonroadEnv):
         yaw = self.observation_collector._ego_state.orientation
         v = max(self.observation["v_ego"], 0.1)
         steering_angle = math.atan(L * self.observation["global_turn_rate"] / v)
+        print(type(center_points))
+        print(np.shape(center_points))
         cx = center_points[:, 0]
         cy = center_points[:, 1]
         path_yaw = np.unwrap(np.arctan2(np.gradient(cy), np.gradient(cx)))
