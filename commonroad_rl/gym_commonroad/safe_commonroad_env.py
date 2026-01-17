@@ -128,7 +128,7 @@ class SafetyVerifier:
         def get_closest_obstacle_lane_velocity_distance(ls: Lanelet):
             lso = ls.get_obstacles(self.scenario.obstacles, self.time_step)
             if len(lso) == 0:
-                r_min = 1.0 / self.kappa(self.dense_lanes[ls.lanelet_id])
+                r_min = 1.0 / self.kappa(self.dense_lanes[ls.lanelet_id][1])
                 v_crit = np.sqrt(r_min * self.prop_ego["a_lat_max"])
                 return v_crit, traveled_distance(self.dense_lanes[ls.lanelet_id][1], self.dense_lanes[ls.lanelet_id][1][-1])
             else:
