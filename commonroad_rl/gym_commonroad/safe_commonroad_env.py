@@ -138,6 +138,7 @@ class SafetyVerifier:
                 pts = self.get_lane_side_obs_intersection(lobs_state.position[0], lobs_state.position[1],
                                                           lobs_state.orientation, lshape.length, lshape.width,
                                                           self.dense_lanes[ls.lanelet_id][1])
+                print(self.dense_lanes[ls.lanelet_id][1])
                 return lobs_state.velocity, traveled_distance(self.dense_lanes[ls.lanelet_id][1], self.dense_lanes[ls.lanelet_id][1][pts[0]])
         if len(successors) == 1:
             v,d = get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successors[0]))
