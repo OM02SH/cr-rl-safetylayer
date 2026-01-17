@@ -543,6 +543,7 @@ class SafetyLayer(CommonroadEnv):
             left_dense = resample_polyline_with_distance(l.left_vertices,0.1)
             center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
                                 (l.center_vertices,left_dense,right_dense), 0.1)
+            print(type(center_dense))
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
