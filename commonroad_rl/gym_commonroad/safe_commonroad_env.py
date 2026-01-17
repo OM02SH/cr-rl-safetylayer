@@ -815,7 +815,7 @@ class SafetyLayer(CommonroadEnv):
         else:
             if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys():
                 self.final_priority = 1
-            fcl_input = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanlet_id][1])
+            fcl_input = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
         steering_velocities = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for sv in steering_velocities:
             safe_min, safe_max = self.find_safe_acceleration(sv)
