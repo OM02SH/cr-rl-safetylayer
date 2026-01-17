@@ -157,7 +157,7 @@ class SafetyVerifier:
                 if lane_id == closest_car:
                     d = d_i
                     v = v_i
-        return center[pt : len(center)], lane, preceding_v, v , d
+        return center[pt[1] : len(center)], lane, preceding_v, v , d
 
     def get_lane_collision_free_areas(self, lane : Lanelet):
         C = []
@@ -519,12 +519,13 @@ class SafetyLayer(CommonroadEnv):
         self.dense_lanes.clear()
         self.conflict_lanes.clear()
         for l in self.scenario.lanelet_network.lanelets:
-            def extend_centerline_to_include_points(center, left_pts, right_pts):
+            def extend_centerline(center, left_pts, right_pts):
                 vec = center[0] - center[1]
                 points = np.vstack([left_pts[0], right_pts[0]])
                 distances = np.dot((points - center[0]), vec / np.linalg.norm(vec))
                 ext_len = max(0, -min(distances))
                 ext = center[0] + vec / np.linalg.norm(vec) * ext_len
+                print(ext)
                 center = np.vstack([ext, center])
 
                 vec = center[-1] - center[-2]
@@ -532,6 +533,7 @@ class SafetyLayer(CommonroadEnv):
                 distances = np.dot((points - center[-1]), vec / np.linalg.norm(vec))
                 ext_len = max(0, max(distances))
                 ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
+                print(ext)
                 center = np.vstack([center, ext])
                 return center
 
@@ -565,7 +567,7 @@ class SafetyLayer(CommonroadEnv):
                 return center_ext
             right_dense = resample_polyline_with_distance(l.right_vertices,0.1)
             left_dense = resample_polyline_with_distance(l.left_vertices,0.1)
-            center_dense = extend_centerline_for_all_lateral(resample_polyline_with_distance
+            center_dense = extend_centerline(resample_polyline_with_distance
                                 (l.center_vertices,0.1),left_dense,right_dense)
             #print(type(center_dense))
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
