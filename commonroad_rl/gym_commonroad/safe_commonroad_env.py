@@ -520,19 +520,23 @@ class SafetyLayer(CommonroadEnv):
         self.conflict_lanes.clear()
         for l in self.scenario.lanelet_network.lanelets:
             def extend_centerline_to_include_points(center, left_pts, right_pts):
-                vec = center[0] - center[1]
-                points = np.vstack([left_pts[0], right_pts[0]])
-                distances = np.dot((points - center[0]), vec / np.linalg.norm(vec))
-                ext_len = max(0, -min(distances))
-                ext = center[0] + vec / np.linalg.norm(vec) * ext_len
-                center = np.vstack([ext, center])
-
-                vec = center[-1] - center[-2]
-                points = np.vstack([left_pts[-1], right_pts[-1]])
-                distances = np.dot((points - center[-1]), vec / np.linalg.norm(vec))
-                ext_len = max(0, max(distances))
-                ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
-                center = np.vstack([center, ext])
+                #vec = center[0] - center[1]
+                #points = np.vstack([left_pts[0], right_pts[0]])
+                #distances = np.dot((points - center[0]), vec / np.linalg.norm(vec))
+                #ext_len = max(0, -min(distances))
+                #ext = center[0] + vec / np.linalg.norm(vec) * ext_len
+                #center = np.vstack([ext, center])
+#
+                #vec = center[-1] - center[-2]
+                #points = np.vstack([left_pts[-1], right_pts[-1]])
+                #distances = np.dot((points - center[-1]), vec / np.linalg.norm(vec))
+                #ext_len = max(0, max(distances))
+                #ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
+                #center = np.vstack([center, ext])
+                if len(l.predecessor) != 0 :
+                    center = np.append(self.scenario.lanelet_network.find_lanelet_by_id[l.predecessor[0]].center_vertices, center, axis=0)
+                if len(l.successor) != 0 :
+                    center = np.append(center,self.scenario.lanelet_network.find_lanelet_by_id(l.successor[0]).center_vertices, axis=0)
                 return center
             right_dense = resample_polyline_with_distance(l.right_vertices,0.1)
             left_dense = resample_polyline_with_distance(l.left_vertices,0.1)
@@ -572,7 +576,7 @@ class SafetyLayer(CommonroadEnv):
             #left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
             #right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
             left = np.array(left)
-            right = np.array(left)
+            right = np.array(right)
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, left, right)
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
