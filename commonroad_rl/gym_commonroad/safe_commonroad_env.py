@@ -60,49 +60,31 @@ class SafetyVerifier:
 
     @staticmethod
     def get_lane_side_obs_intersection(x, y, orientation, length, width, curve: np.ndarray):
-        import numpy as np
-        import math
-
-        # Rotate points into car frame
         def rotate(px, py):
             s, c = math.sin(-orientation), math.cos(-orientation)
             dx, dy = px - x, py - y
             return dx * c - dy * s, dx * s + dy * c
-
         local = np.array([rotate(px, py) for px, py in curve])
         l, w = length / 2, width / 2
-
-        # Rectangle edges (4 segments)
         rect = np.array([
             [-l, -w], [l, -w],
             [l, -w], [l, w],
             [l, w], [-l, w],
-            [-l, w], [-l, -w]
-        ])
-
+            [-l, w], [-l, -w]   ])
         def segment_intersect(p1, p2, q1, q2):
-            """Check if segments (p1,p2) and (q1,q2) intersect using cross products"""
-
             def ccw(a, b, c):
                 return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
-
             return ccw(p1, q1, q2) != ccw(p2, q1, q2) and ccw(p1, p2, q1) != ccw(p1, p2, q2)
-
         hits = []
-
-        # Check each curve segment against each rectangle edge
         for i in range(len(local) - 1):
             p1, p2 = local[i], local[i + 1]
             for j in range(0, len(rect), 2):
                 q1, q2 = rect[j], rect[j + 1]
                 if segment_intersect(p1, p2, q1, q2):
                     hits.append(i)
-                    break  # only record once per segment
-
+                    break
         if not hits:
             return None
-
-        # Keep at most two intersections (enter + exit)
         return hits[:2]
 
     @staticmethod
@@ -187,7 +169,7 @@ class SafetyVerifier:
         r_id = lane.adj_right if lane.adj_right_same_direction else None
         # empty lane with no vehicle entering or exiting it
         if len(obs) == 0:
-            print("Empty lane")
+            print("Real Empty lane")
             return [(center, lane, 0.0, self.v_max, 0.0)]
         i = 0
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
@@ -563,12 +545,8 @@ class SafetyLayer(CommonroadEnv):
             left = np.array([])
             right = np.array([])
             try:
-                for x,y in l.left_vertices:
-                    left = np.append(left,np.array(ct.convert_to_curvilinear_coords(x,y)))
-                for x,y in l.right_vertices:
-                    right = np.append(right,np.array(ct.convert_to_curvilinear_coords(x,y)))
-                #left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
-                #right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
+                left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
+                right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             except CartesianProjectionDomainError:
                 pass
                 #print("left: ", l.left_vertices)
