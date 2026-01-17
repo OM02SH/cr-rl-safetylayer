@@ -534,10 +534,39 @@ class SafetyLayer(CommonroadEnv):
                 ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
                 center = np.vstack([center, ext])
                 return center
+
+            def extend_centerline_for_all_lateral(center: np.ndarray,
+                                                  left_pts: np.ndarray,
+                                                  right_pts: np.ndarray):
+                center_ext = center.copy()
+                # Function to extend a segment if lateral points are beyond it
+                def extend_segment(start_idx, vec, lateral_points):
+                    points = lateral_points[start_idx]
+                    distance = np.dot(points - center_ext[start_idx], vec / np.linalg.norm(vec))
+                    if start_idx == 0:
+                        # extend backward
+                        ext_len = -min(0, distance)
+                        if ext_len > 0:
+                            ext = center_ext[0] - vec / np.linalg.norm(vec) * ext_len
+                            center_ext[0] = ext  # move start point backward
+                    else:
+                        # extend forward
+                        ext_len = max(0, distance)
+                        if ext_len > 0:
+                            ext = center_ext[-1] + vec / np.linalg.norm(vec) * ext_len
+                            center_ext[-1] = ext  # move end point forward
+
+                # --- Check all points along the lane ---
+                for i in [0, -1]:  # first and last index
+                    vec_start = center_ext[1] - center_ext[0]
+                    vec_end = center_ext[-1] - center_ext[-2]
+                    extend_segment(0, vec_start, np.vstack([left_pts[0], right_pts[0]]))
+                    extend_segment(-1, vec_end, np.vstack([left_pts[-1], right_pts[-1]]))
+                return center_ext
             right_dense = resample_polyline_with_distance(l.right_vertices,0.1)
             left_dense = resample_polyline_with_distance(l.left_vertices,0.1)
-            center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
-                                (l.center_vertices,left_dense,right_dense), 0.1)
+            center_dense = extend_centerline_for_all_lateral(resample_polyline_with_distance
+                                (l.center_vertices,0.1),left_dense,right_dense)
             #print(type(center_dense))
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
