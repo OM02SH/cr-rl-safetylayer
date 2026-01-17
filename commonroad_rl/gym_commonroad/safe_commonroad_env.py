@@ -170,7 +170,7 @@ class SafetyVerifier:
         # empty lane with no vehicle entering or exiting it
         if len(obs) == 0:
             print("Real Empty lane")
-            return [(center, lane, 0.0, self.v_max, 0.0)]
+            return [self.get_end_collision_free_area(lane, center, [0,0], 0)]
         i = 0
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
         obs_state = obs[i].state_at_time(self.time_step)
@@ -199,7 +199,8 @@ class SafetyVerifier:
                 pt = pts[1]
             preceding_v = obs_state.velocity
         if len(pts) == 2 and ((lane.lanelet_id == self.ego_lanelet.lanelet_id) |
-                              (l_id and l_id == lane.lanelet_id) | (r_id and r_id == lane.lanelet_id)):
+                              (l_id is not None and l_id == lane.lanelet_id) |
+                              (r_id is not None and r_id == lane.lanelet_id)):
             # add last collision free area only for the ego and adjacent lanes
             C.append(self.get_end_collision_free_area(lane, center, pt, preceding_v))
         print("collision free area")
@@ -384,7 +385,9 @@ class SafetyVerifier:
                         if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                             print(type(left_points), type(right_points))
-                            assert type(left_points[0]) == np.ndarray
+                            if type(left_points[0]) != np.ndarray:
+                                print("invalid left points lane : ", lane.lanelet_id)
+                                exit(1)
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
                             for i in range(len(left_bound)):
@@ -547,11 +550,15 @@ class SafetyLayer(CommonroadEnv):
             for x,y in left_dense:
                 try:
                     left = np.append(left,np.array(ct.convert_to_curvilinear_coords(x,y)))
-                except CartesianProjectionDomainError:  pass
+                except CartesianProjectionDomainError:
+                    print("Error in lane : " , l.lanelet_id)
+                    pass
             for x,y in right_dense:
                 try:
                     right = np.append(right,np.array(ct.convert_to_curvilinear_coords(x,y)))
-                except CartesianProjectionDomainError:  pass
+                except CartesianProjectionDomainError:
+                    print("Error in lane : " , l.lanelet_id)
+                    pass
             #try:
             #    left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in left_dense])
             #    right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in right_dense])
