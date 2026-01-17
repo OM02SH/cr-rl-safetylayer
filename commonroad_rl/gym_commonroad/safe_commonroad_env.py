@@ -283,6 +283,7 @@ class SafetyVerifier:
             if s_min_final < s_max_final:
                 start = np.argmin(np.abs(s_centers - s_min_final))
                 end = np.argmin(np.abs(s_centers - s_max_final))
+                if(start == end): continue
                 # Changed from the original formula d_lim = r_min - sqrt(r_min^2 - l_front^2 + 0.5w),
                 # as the car shape will be handled in the action testing part with Shapely, replaced it
                 # with a lookahead distance equal to the velocity as we do this for each timestamp
@@ -392,6 +393,7 @@ class SafetyVerifier:
                         if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                             print(type(left_points), type(right_points))
+                            print(type(left_points[0]), type(right_points[0]))
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
                             for i in range(len(left_bound)):
