@@ -250,7 +250,6 @@ class SafetyVerifier:
                - d -> The Area to leave on edges for safe bounds in the lane
         """
         print(xi , "   ",yi, "   ",v_i, "   ",xj, "   ",yj, "   ",v_j)
-        print("fsdihaihboeiw.jivcxbii")
         ct,_,_ = self.precomputed_lane_polygons[l_id]
         tc = ct.reference_path()
         # print(tc)
