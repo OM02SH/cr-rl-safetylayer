@@ -194,7 +194,7 @@ class SafetyVerifier:
             i += 1
             if len(obs) == i:
                 for o in obs: print(o)
-                print(center)
+                # print(center)
                 print("Empty lane")
                 return [(center, lane, 0.0, self.v_max, 0.0)]
             obs_state = obs[i].state_at_time(self.time_step)
@@ -705,7 +705,7 @@ class SafetyLayer(CommonroadEnv):
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
         low, high = -1, 1
-        print("action : " , self.ego_action)
+        #print("action : " , self.ego_action)
         print("steering velocity : ", sv)
         while high - low > 1e-5:
             mid = (low + high) / 2
