@@ -57,41 +57,53 @@ class SafetyVerifier:
             if self.ego_lanelet.adj_right_same_direction:
                 lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right))
         return lanes
+
     @staticmethod
-    def get_lane_side_obs_intersection(x, y, orientation, length, width, curve : np.ndarray):
-        def rotate(px, py, cx, cy, angle):
-            s, c = math.sin(-angle), math.cos(-angle)
-            dx, dy = px - cx, py - cy
+    def get_lane_side_obs_intersection(x, y, orientation, length, width, curve: np.ndarray):
+        import numpy as np
+        import math
+
+        # Rotate points into car frame
+        def rotate(px, py):
+            s, c = math.sin(-orientation), math.cos(-orientation)
+            dx, dy = px - x, py - y
             return dx * c - dy * s, dx * s + dy * c
-        def inside(px, py):
-            return (-l <= px <= l) and (-w <= py <= w)
-        local = np.array([rotate(px, py, x, y, orientation) for px, py in curve])
-        l = length / 2
-        w = width / 2
-        p = None
-        eps = 1e-9
-        def on_edge(px, py):
-            if abs(px + l) <= eps and -w - eps <= py <= w + eps:  # left
-                return True
-            if abs(px - l) <= eps and -w - eps <= py <= w + eps:  # right
-                return True
-            if abs(py + w) <= eps and -l - eps <= px <= l + eps:  # bottom
-                return True
-            if abs(py - w) <= eps and -l - eps <= px <= l + eps:  # top
-                return True
-            return False
-        for i, (lx, ly) in enumerate(local):
-            if on_edge(lx, ly):
-                if p is None:   p = i
-                else:   return [p, i]  # if two curve points are on the edges
+
+        local = np.array([rotate(px, py) for px, py in curve])
+        l, w = length / 2, width / 2
+
+        # Rectangle edges (4 segments)
+        rect = np.array([
+            [-l, -w], [l, -w],
+            [l, -w], [l, w],
+            [l, w], [-l, w],
+            [-l, w], [-l, -w]
+        ])
+
+        def segment_intersect(p1, p2, q1, q2):
+            """Check if segments (p1,p2) and (q1,q2) intersect using cross products"""
+
+            def ccw(a, b, c):
+                return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
+
+            return ccw(p1, q1, q2) != ccw(p2, q1, q2) and ccw(p1, p2, q1) != ccw(p1, p2, q2)
+
+        hits = []
+
+        # Check each curve segment against each rectangle edge
         for i in range(len(local) - 1):
-            p1_inside = inside(*local[i])
-            if p1_inside == inside(*local[i + 1]):  # either both are out or both are in
-                continue
-            outside_idx = i if not p1_inside else i + 1
-            if p is None:   p = outside_idx
-            else:   return [p, outside_idx]
-        return [p] if p is not None else None
+            p1, p2 = local[i], local[i + 1]
+            for j in range(0, len(rect), 2):
+                q1, q2 = rect[j], rect[j + 1]
+                if segment_intersect(p1, p2, q1, q2):
+                    hits.append(i)
+                    break  # only record once per segment
+
+        if not hits:
+            return None
+
+        # Keep at most two intersections (enter + exit)
+        return hits[:2]
 
     @staticmethod
     def kappa(laneCenterPoints):
@@ -120,16 +132,12 @@ class SafetyVerifier:
                                                      obs_state.orientation,shape.length, shape.width, right)
         pts = []
         for k in (c_pts, l_pts, r_pts):
-            if k is not None:
-                pts.extend(k)
-        if not pts:
-            return None
+            if k is not None:   pts.extend(k)
+        if not pts: return None
         start = min(pts)
         end = max(pts)
-        if start == end:
-            return [start]
-        else:
-            return [start, end]
+        if start == end:    return [start]
+        else:   return [start, end]
 
     def get_end_collision_free_area(self, lane : Lanelet, center, pt, preceding_v):
         successors = lane.successor
@@ -190,7 +198,7 @@ class SafetyVerifier:
             if len(obs) == i:
                 for o in obs: print(o)
                 # print(center)
-                print("Empty lane")
+                print("noooooooooooooooooo")
                 return [(center, lane, 0.0, self.v_max, 0.0)]
             obs_state = obs[i].state_at_time(self.time_step)
             pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
