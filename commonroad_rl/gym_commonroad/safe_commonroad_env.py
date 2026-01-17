@@ -526,30 +526,22 @@ class SafetyLayer(CommonroadEnv):
                 ext_len = max(0, -min(distances))
                 ext = center[0] + vec / np.linalg.norm(vec) * ext_len
                 center = np.vstack([ext, center])
-#
+
                 vec = center[-1] - center[-2]
                 points = np.vstack([left_pts[-1], right_pts[-1]])
                 distances = np.dot((points - center[-1]), vec / np.linalg.norm(vec))
                 ext_len = max(0, max(distances))
                 ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
                 center = np.vstack([center, ext])
-
-            def extend(center):
-                if len(l.predecessor) != 0 :
-                    other_center = resample_polyline_with_distance(self.scenario.lanelet_network.find_lanelet_by_id(l.predecessor[0]).center_vertices, 0.1)
-                    center = np.append(other_center[-min(len(other_center), 10):], center, axis=0)
-                if len(l.successor) != 0 :
-                    other_center = resample_polyline_with_distance(self.scenario.lanelet_network.find_lanelet_by_id(l.successor[0]).center_vertices,0.1)
-                    center = np.append(center,other_center[:10], axis=0)
                 return center
-
             right_dense = resample_polyline_with_distance(l.right_vertices,0.1)
             left_dense = resample_polyline_with_distance(l.left_vertices,0.1)
-            center_dense = resample_polyline_with_distance(l.center_vertices, 0.1)
-            center_dense = extend(center_dense)
+            center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
+                                (l.center_vertices,left_dense,right_dense), 0.1)
             #print(type(center_dense))
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
+            x,y = 0,0
             left = []
             right = []
             for x,y in left_dense:
