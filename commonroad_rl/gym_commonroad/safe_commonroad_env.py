@@ -36,6 +36,7 @@ class SafetyVerifier:
 
     def __init__(self, scenario: Scenario, prop_ego, precomputed_lane_polygons, dense_lanes):
         self.scenario = scenario
+        print(scenario.scenario_id)
         self.v_max = 45
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
@@ -217,6 +218,7 @@ class SafetyVerifier:
                               (l_id and l_id == lane.lanelet_id) | (r_id and r_id == lane.lanelet_id)):
             # add last collision free area only for the ego and adjacent lanes
             C.append(self.get_end_collision_free_area(lane, center, pt, preceding_v))
+        print(C)
         return C
 
     def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle]) -> List[Obstacle]:
@@ -248,6 +250,7 @@ class SafetyVerifier:
                - d -> The Area to leave on edges for safe bounds in the lane
         """
         print(xi , "   ",yi, "   ",v_i, "   ",xj, "   ",yj, "   ",v_j)
+        print("fsdihaihboeiw.jivcxbii")
         ct,_,_ = self.precomputed_lane_polygons[l_id]
         tc = ct.reference_path()
         # print(tc)
