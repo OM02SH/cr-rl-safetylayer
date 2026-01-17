@@ -218,6 +218,8 @@ class SafetyVerifier:
                               (l_id and l_id == lane.lanelet_id) | (r_id and r_id == lane.lanelet_id)):
             # add last collision free area only for the ego and adjacent lanes
             C.append(self.get_end_collision_free_area(lane, center, pt, preceding_v))
+        print("collision free area")
+        print("------------------------------------------------------------------")
         print(C)
         return C
 
@@ -340,6 +342,9 @@ class SafetyVerifier:
         self.in_or_entering_intersection = in_or_entering_intersection
         S : List[Tuple[List[Tuple[np.ndarray,np.ndarray,float,float,float]],Lanelet]] = []
         C = []
+        print("lanes to check")
+        for l in self.get_reachable_lanes():
+            print(l.lanelet_id)
         for lane in self.get_reachable_lanes():
             C.extend(self.get_lane_collision_free_areas(lane))
         for c in C:
@@ -394,8 +399,8 @@ class SafetyVerifier:
                         if start == end : continue
                         if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
-                            #print(type(left_points), type(right_points))
-                            #print(type(left_points[0]), type(right_points[0]))
+                            print(type(left_points), type(right_points))
+                            assert type(left_points[0]) == np.ndarray
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
                             for i in range(len(left_bound)):
