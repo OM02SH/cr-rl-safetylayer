@@ -65,7 +65,7 @@ class SafetyVerifier:
             return dx * c - dy * s, dx * s + dy * c
         def inside(px, py):
             return (-l <= px <= l) and (-w <= py <= w)
-        local = np.array(rotate(curve[0],curve[1],x, y, orientation))
+        local = np.array([rotate(px, py, x, y, orientation) for px, py in curve])
         l = length / 2
         w = width / 2
         p = None
@@ -82,22 +82,16 @@ class SafetyVerifier:
             return False
         for i, (lx, ly) in enumerate(local):
             if on_edge(lx, ly):
-                if p is None:
-                    p = i
-                else:
-                    result = [p, i]
-                    return result  # if two curve points are on the edges
+                if p is None:   p = i
+                else:   return [p, i]  # if two curve points are on the edges
         for i in range(len(local) - 1):
             p1_inside = inside(*local[i])
             if p1_inside == inside(*local[i + 1]):  # either both are out or both are in
                 continue
             outside_idx = i if not p1_inside else i + 1
-            if p is None:
-                p = outside_idx
-            else:
-                result = [p, outside_idx]
-                return result
-        return [p] if p else None
+            if p is None:   p = outside_idx
+            else:   return [p, outside_idx]
+        return [p] if p is not None else None
 
     @staticmethod
     def kappa(laneCenterPoints):
@@ -554,7 +548,6 @@ class SafetyLayer(CommonroadEnv):
             center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
                                 (l.center_vertices,left_dense,right_dense), 0.1)
             #print(type(center_dense))
-            print(right_dense)
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
