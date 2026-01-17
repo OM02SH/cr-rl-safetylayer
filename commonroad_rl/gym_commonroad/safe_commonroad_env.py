@@ -720,22 +720,55 @@ class SafetyLayer(CommonroadEnv):
         safe_max = low
         return safe_min, safe_max
 
+    def neighbor_check(self, curr, other):
+        """
+            0 -> not a neighbor
+            1 -> left neighbor
+            2 -> right neighbor
+        """
+        curr_l = self.scenario.lanelet_network.find_lanelet_by_id(curr)
+        if curr_l.adj_right_same_direction:
+            if curr_l.adj_right == other:
+                return True
+        if curr_l.adj_left_same_direction:
+            if curr_l.adj_left == other:
+                return True
+        return False
+
     def lane_safety(self):
         """
             Returns an array of safe actions each as a tuple of (sv,(a_min,a_max)).
             This does a max of 396 checks to build the Safe action set
         """
         At_safe_l = []
-        fcl_input = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
-        if self.observation_collector.ego_lanelet.adj_left_same_direction:
-            if self.observation_collector.ego_lanelet.adj_right_same_direction:
-                steering_velocities = np.linspace(-0.8, 0.8, 11) # left, current and right
+        route_ids = self.observation_collector.navigator.route.list_ids_lanelets
+        if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
+            print(route_ids)
+            print("past lanes : ", self.past_ids)
+            if self.past_ids[len(self.past_ids)-2] in route_ids:
+                last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
+                if last_index == len(route_ids) - 1:
+                    print("returned empty list")
+                    return np.array([])  # simulation is done no next route
+                if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]) :
+                    fcl_input = self.compute_steering_velocity(self.dense_lanes[route_ids[last_index]][1]) # swerved into a neighbor
+                else: # got into a wrong successor
+                    fcl_input = self.compute_steering_velocity(self.dense_lanes[route_ids[last_index + 1]][1])
+                steering_velocities = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # return to the route
+            else: # lost
+                print("Lost")
+                return np.array([])
+        else :
+            fcl_input = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
+            if self.observation_collector.ego_lanelet.adj_left_same_direction:
+                if self.observation_collector.ego_lanelet.adj_right_same_direction:
+                    steering_velocities = np.linspace(-0.8, 0.8, 11) # left, current and right
+                else:
+                    steering_velocities = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
+            elif self.observation_collector.ego_lanelet.adj_right_same_direction:
+                steering_velocities = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
             else:
-                steering_velocities = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
-        elif self.observation_collector.ego_lanelet.adj_right_same_direction:
-            steering_velocities = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
-        else:
-            steering_velocities = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
+                steering_velocities = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for sv in steering_velocities:
             safe_min, safe_max = self.find_safe_acceleration(sv)
             if safe_min <= safe_max:    At_safe_l.extend([sv, safe_min, safe_max])
@@ -801,24 +834,38 @@ class SafetyLayer(CommonroadEnv):
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
             print(route_ids)
-            print("past kanes : ", self.past_ids)
-        curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
-        if curr_index == len(route_ids) - 1:
-            print("returned empty list")
-            return np.array([]) # simulation is done no next route
-        nxt_id = route_ids[curr_index + 1]
-        nxt_lane = self.scenario.lanelet_network.find_lanelet_by_id(nxt_id)
-        if not self.pre_intersection_lanes:
-            self.pre_intersection_lanes = self.get_per_intersection_lanes_update_priority(nxt_lane)
+            print("past lanes : ", self.past_ids)
+            if self.past_ids[len(self.past_ids) - 2] in route_ids:
+                last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
+                if last_index == len(route_ids) - 1:
+                    print("returned empty list")
+                    return np.array([])  # simulation is done no next route
+                if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]):
+                    fcl_input = self.compute_steering_velocity(
+                        self.dense_lanes[route_ids[last_index]][1])  # swerved into a neighbor
+                else:  # got into a wrong successor
+                    fcl_input = self.compute_steering_velocity(self.dense_lanes[route_ids[last_index + 1]][1])
+            else:  # lost
+                print("Lost")
+                return np.array([])
         else:
-            self.priority(nxt_lane, self.pre_intersection_lanes)
-        if self.prop_ego["ego_length"] / 2 >= self.observation["distance_to_lane_end"]:
-            fcl_input = self.compute_steering_velocity(self.dense_lanes[nxt_lane.lanelet_id][1])
-            self.final_priority = 1
-        else:
-            if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys():
+            curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
+            if curr_index == len(route_ids) - 1:
+                print("returned empty list")
+                return np.array([]) # simulation is done no next route
+            nxt_id = route_ids[curr_index + 1]
+            nxt_lane = self.scenario.lanelet_network.find_lanelet_by_id(nxt_id)
+            if not self.pre_intersection_lanes:
+                self.pre_intersection_lanes = self.get_per_intersection_lanes_update_priority(nxt_lane)
+            else:
+                self.priority(nxt_lane, self.pre_intersection_lanes)
+            if self.prop_ego["ego_length"] / 2 >= self.observation["distance_to_lane_end"]:
+                fcl_input = self.compute_steering_velocity(self.dense_lanes[nxt_lane.lanelet_id][1])
                 self.final_priority = 1
-            fcl_input = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
+            else:
+                if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys():
+                    self.final_priority = 1
+                fcl_input = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
         steering_velocities = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for sv in steering_velocities:
             safe_min, safe_max = self.find_safe_acceleration(sv)
