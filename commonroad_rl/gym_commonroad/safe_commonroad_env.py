@@ -391,6 +391,7 @@ class SafetyVerifier:
                         if start == end : continue
                         if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
+                            print(type(left_points), type(right_points))
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
                             for i in range(len(left_bound)):
