@@ -416,6 +416,7 @@ class SafetyLayer(CommonroadEnv):
         super().__init__(meta_scenario_path, train_reset_config_path, test_reset_config_path, visualization_path,
                          logging_path, test_env, play, config_file, logging_mode, **kwargs)
         self.observation = None
+        self.past_ids = []
         self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.lane_width = 5
@@ -462,7 +463,9 @@ class SafetyLayer(CommonroadEnv):
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
+        self.past_ids = []
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
+        self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
         ct ,_ ,_ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
@@ -590,6 +593,8 @@ class SafetyLayer(CommonroadEnv):
                     action[0] = 0
                     action[1] = -1
         observation, reward, terminated, truncated, info = super().step(action)
+        if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
+            self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         if reward_for_safe_action:
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
@@ -790,6 +795,9 @@ class SafetyLayer(CommonroadEnv):
         """
         At_safe_in : List[float] = []
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
+        if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
+            print(route_ids)
+            print("past kanes : ", self.past_ids)
         curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
         if curr_index == len(route_ids) - 1:
             print("returned empty list")
