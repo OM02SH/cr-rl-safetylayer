@@ -534,7 +534,7 @@ class SafetyLayer(CommonroadEnv):
                 #ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
                 #center = np.vstack([center, ext])
                 if len(l.predecessor) != 0 :
-                    center = np.append(self.scenario.lanelet_network.find_lanelet_by_id[l.predecessor[0]].center_vertices, center, axis=0)
+                    center = np.append(self.scenario.lanelet_network.find_lanelet_by_id(l.predecessor[0]).center_vertices, center, axis=0)
                 if len(l.successor) != 0 :
                     center = np.append(center,self.scenario.lanelet_network.find_lanelet_by_id(l.successor[0]).center_vertices, axis=0)
                 return center
