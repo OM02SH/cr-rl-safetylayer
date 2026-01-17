@@ -763,7 +763,7 @@ class SafetyLayer(CommonroadEnv):
             intersection_lanes_obs = []
             for l in incoming_lanes:
                 obs = self.scenario.lanelet_network.find_lanelet_by_id(l).get_obstacles(self.scenario.obstacles, self.time_step)
-                obs = self.safety_verifier.sort_obstacles_in_lane(l.lanelet_id, obs)
+                obs = self.safety_verifier.sort_obstacles_in_lane(l, obs)
                 if not obs: continue
                 intersection_lanes_obs.append((l, obs[-1]))
             for k in intersection_lanes_obs:
