@@ -121,10 +121,10 @@ class SafetyVerifier:
         if start == end:    return [start]
         else:   return [start, end]
 
-    def get_end_collision_free_area(self, lane : Lanelet, center, pt, preceding_v):
+    def get_end_collision_free_area(self, lane : Lanelet, center, pt : list[int], preceding_v):
         successors = lane.successor
         if len(successors) == 0:
-            return center[pt : len(center)], lane, preceding_v, self.v_max , 0
+            return center[pt[1] : len(center)], lane, preceding_v, self.v_max , 0
         def get_closest_obstacle_lane_velocity_distance(ls: Lanelet):
             lso = ls.get_obstacles(self.scenario.obstacles, self.time_step)
             if len(lso) == 0:
@@ -134,10 +134,7 @@ class SafetyVerifier:
             else:
                 lso = self.sort_obstacles_in_lane(ls.lanelet_id, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
-                lshape = lso[0].occupancy_at_time(self.time_step).shape
-                pts = self.get_lane_side_obs_intersection(lobs_state.position[0], lobs_state.position[1],
-                                                          lobs_state.orientation, lshape.length, lshape.width,
-                                                          self.dense_lanes[ls.lanelet_id][1])
+                pts = self.obs_start_end_index(lso[0],ls.lanelet_id)
                 print(self.dense_lanes[ls.lanelet_id][1])
                 return lobs_state.velocity, traveled_distance(self.dense_lanes[ls.lanelet_id][1], self.dense_lanes[ls.lanelet_id][1][pts[0]])
         if len(successors) == 1:
