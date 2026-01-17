@@ -544,13 +544,21 @@ class SafetyLayer(CommonroadEnv):
             x,y = 0,0
             left = np.array([])
             right = np.array([])
-            try:
-                left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in left_dense])
-                right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in right_dense])
-                print(left)
-                print(right)
-            except CartesianProjectionDomainError:
-                pass
+            for x,y in left_dense:
+                try:
+                    left = np.append(left,np.array(ct.convert_to_curvilinear_coords(x,y)))
+                except CartesianProjectionDomainError:  pass
+            for x,y in right_dense:
+                try:
+                    right = np.append(right,np.array(ct.convert_to_curvilinear_coords(x,y)))
+                except CartesianProjectionDomainError:  pass
+            #try:
+            #    left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in left_dense])
+            #    right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in right_dense])
+            #    print(left)
+            #    print(right)
+            #except CartesianProjectionDomainError:
+            #    pass
                 #print("left: ", l.left_vertices)
                 #print("center: ", l.center_vertices)
                 #print("right: ", l.right_vertices)
