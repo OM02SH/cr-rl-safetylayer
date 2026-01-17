@@ -543,20 +543,19 @@ class SafetyLayer(CommonroadEnv):
                                 (l.center_vertices,left_dense,right_dense), 0.1)
             #print(type(center_dense))
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
-            if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
             x,y = 0,0
-            left = np.array([])
-            right = np.array([])
+            left = []
+            right = []
             for x,y in left_dense:
                 try:
-                    left = np.append(left,np.array(ct.convert_to_curvilinear_coords(x,y)))
+                    left.append(np.array(ct.convert_to_curvilinear_coords(x,y)))
                 except CartesianProjectionDomainError:
                     print("Error in lane : " , l.lanelet_id)
                     pass
             for x,y in right_dense:
                 try:
-                    right = np.append(right,np.array(ct.convert_to_curvilinear_coords(x,y)))
+                    right.append(np.array(ct.convert_to_curvilinear_coords(x,y)))
                 except CartesianProjectionDomainError:
                     print("Error in lane : " , l.lanelet_id)
                     pass
@@ -575,6 +574,8 @@ class SafetyLayer(CommonroadEnv):
             # Extend first/last points to handle boundary
             #left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
             #right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
+            left = np.array(left)
+            right = np.array(left)
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, left, right)
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
