@@ -311,7 +311,7 @@ class SafetyVerifier:
                 r_end, _ = ct.convert_to_curvilinear_coords(rcp[c2][0],rcp[c2][1])
                 start = max(l_start, r_start)
                 end = min(l_end, r_end)
-                if start <= end:
+                if start < end:
                     nls.append((start, end, lv, dl, -4))
                     nrs.append((start, end, rv, -4, dr))
         return [(nls,ll), (nrs,rl)]
@@ -388,6 +388,7 @@ class SafetyVerifier:
                 k, lane = s
                 if lane.lanelet_id == l.lanelet_id:
                     for start, end, v, dl, dr in k:
+                        if start == end : continue
                         if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                             left_bound = left_points[start: end + 1]
@@ -550,9 +551,9 @@ class SafetyLayer(CommonroadEnv):
             right = np.array([])
             try:
                 for x,y in l.left_vertices:
-                    left = np.append(left,ct.convert_to_curvilinear_coords(x,y))
+                    left = np.append(left,np.array(ct.convert_to_curvilinear_coords(x,y)))
                 for x,y in l.right_vertices:
-                    right = np.append(right,ct.convert_to_curvilinear_coords(x,y))
+                    right = np.append(right,np.array(ct.convert_to_curvilinear_coords(x,y)))
                 #left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
                 #right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             except CartesianProjectionDomainError:
