@@ -250,7 +250,7 @@ class SafetyVerifier:
         print(xi , "   ",yi, "   ",v_i, "   ",xj, "   ",yj, "   ",v_j)
         ct,_,_ = self.precomputed_lane_polygons[l_id]
         tc = ct.reference_path()
-        print(tc)
+        # print(tc)
         # for c in cp:    tc.append(ct.convert_to_curvilinear_coords(*c))
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
@@ -283,7 +283,6 @@ class SafetyVerifier:
             if s_min_final < s_max_final:
                 start = np.argmin(np.abs(s_centers - s_min_final))
                 end = np.argmin(np.abs(s_centers - s_max_final))
-                print(s_centers)
                 if start == end: continue
                 # Changed from the original formula d_lim = r_min - sqrt(r_min^2 - l_front^2 + 0.5w),
                 # as the car shape will be handled in the action testing part with Shapely, replaced it
@@ -393,20 +392,20 @@ class SafetyVerifier:
                         if start == end : continue
                         if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
-                            print(type(left_points), type(right_points))
-                            print(type(left_points[0]), type(right_points[0]))
+                            #print(type(left_points), type(right_points))
+                            #print(type(left_points[0]), type(right_points[0]))
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
                             for i in range(len(left_bound)):
-                                print(type(left_bound[i]))
-                                print(type(right_bound[i]))
+                                #print(type(left_bound[i]))
+                                #print(type(right_bound[i]))
                                 left_bound[i] = np.array(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl))
                                 right_bound[i] = np.array(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] + dr))
                             lane_polygon = Polygon(left_bound + right_bound[::-1])
                             if lane_polygon.contains(rect): return True
                             # allow intersections with the end and start of the lane for lane change
                             return not(LineString(left_bound).intersects(rect) or LineString(right_bound).intersects(rect))
-                        print("Tested acceleration with suitable v  : " , a)
+                        #print("Tested acceleration with suitable v  : " , a)
                         if in_safe_space(lp, rp):   return True
         return False
 
@@ -494,7 +493,7 @@ class SafetyLayer(CommonroadEnv):
         elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
-        for k in self.observation.keys():   print(k, " : ", self.observation[k])
+        # for k in self.observation.keys():   print(k, " : ", self.observation[k])
         observation_vector = self.pack_observation(initial_observation)
         return observation_vector, info
 
@@ -547,7 +546,7 @@ class SafetyLayer(CommonroadEnv):
             left_dense = resample_polyline_with_distance(l.left_vertices,0.1)
             center_dense = resample_polyline_with_distance(extend_centerline_to_include_points
                                 (l.center_vertices,left_dense,right_dense), 0.1)
-            print(type(center_dense))
+            #print(type(center_dense))
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             if center_dense.size < 6: continue
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
@@ -562,11 +561,12 @@ class SafetyLayer(CommonroadEnv):
                 #left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.left_vertices])
                 #right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in l.right_vertices])
             except CartesianProjectionDomainError:
-                print("left: ", l.left_vertices)
-                print("center: ", l.center_vertices)
-                print("right: ", l.right_vertices)
-                print("dense center: ", center_dense[0], "  -  " , center_dense[-1])
-                print("Error point : ",x, "  ",y)
+                pass
+                #print("left: ", l.left_vertices)
+                #print("center: ", l.center_vertices)
+                #print("right: ", l.right_vertices)
+                #print("dense center: ", center_dense[0], "  -  " , center_dense[-1])
+                #print("Error point : ",x, "  ",y)
             # Extend first/last points to handle boundary
             #left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
             #right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
@@ -620,11 +620,12 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
+        print(actions)
         if actions.size > 33:   actions = actions[:33]
         elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype= object)
-        for k in self.observation.keys():   print(k, " : ", self.observation[k])
+        #for k in self.observation.keys():   print(k, " : ", self.observation[k])
         observation_vector = self.pack_observation(observation)
         return observation_vector, reward, terminated, truncated, info
 
@@ -694,8 +695,8 @@ class SafetyLayer(CommonroadEnv):
         yaw = self.observation_collector._ego_state.orientation
         v = max(self.observation["v_ego"], 0.1)
         steering_angle = math.atan(L * self.observation["global_turn_rate"] / v)
-        print(type(center_points))
-        print(np.shape(center_points))
+        #print(type(center_points))
+        #print(np.shape(center_points))
         cx = center_points[:, 0]
         cy = center_points[:, 1]
         path_yaw = np.unwrap(np.arctan2(np.gradient(cy), np.gradient(cx)))
@@ -882,3 +883,4 @@ class SafetyLayer(CommonroadEnv):
     @property
     def observation_space(self):
         return spaces.Box(low=self.new_low, high=self.new_high, dtype=self.observation_collector.observation_space.dtype)
+
