@@ -500,6 +500,7 @@ class SafetyLayer(CommonroadEnv):
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
         # for k in self.observation.keys():   print(k, " : ", self.observation[k])
         observation_vector = self.pack_observation(initial_observation)
+        print("")
         return observation_vector, info
 
     def compute_lane_sides_and_conflict(self):
@@ -632,6 +633,7 @@ class SafetyLayer(CommonroadEnv):
         if terminated:
             print(info)
             print(self.termination_reason)
+        print("")
         return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
