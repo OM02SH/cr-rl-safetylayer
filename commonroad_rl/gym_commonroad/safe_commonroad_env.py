@@ -4,7 +4,6 @@ import numpy as np
 from typing import List, Tuple, Optional, Union, Dict
 
 from casadi.tools.structure3 import isIterable
-from commonroad_rl.temp import center_dense
 from gymnasium import spaces
 from shapely.geometry import Polygon, LineString
 from shapely.affinity import rotate, translate
