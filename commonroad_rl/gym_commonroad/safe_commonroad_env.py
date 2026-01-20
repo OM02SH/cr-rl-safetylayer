@@ -570,6 +570,15 @@ class SafetyLayer(CommonroadEnv):
             center_dense = np.delete(center_dense, to_remove, axis=0)
             right_dense = np.delete(right_dense, to_remove, axis=0)
             left_dense = np.delete(left_dense, to_remove, axis=0)
+            print(type(left_dense))
+            print(type(right_dense))
+            print(type(center_dense))
+            if type(center_dense) is not np.ndarray:
+                print("Center dense is not a numpy array")
+                print(l.center_vertices)
+                print(l.left_vertices)
+                print(l.right_vertices)
+                print(to_remove)
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             left = np.array(left)
             right = np.array(right)
@@ -683,14 +692,17 @@ class SafetyLayer(CommonroadEnv):
         a_max = 5
         nearest, farthest = self.observation["ego_distance_intersection"]
         if farthest < 0 or nearest <= 0 <= farthest:
+            print("intersection check nearest farthest")
             return False
         if (self.observation["v_ego"]**2 / (2 * a_max) < self.observation["distance_to_lane_end"] or
                 self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys()):
+            print("intersection check True")
             if self.observation["v_ego"]**2 / (2 * a_max) < self.observation["distance_to_lane_end"]:
                 print("near lane end")
             else:
                 print("in intersection")
             return True
+        print("intersection check False")
         return False
 
     def compute_steering_velocity(self, center_points):
