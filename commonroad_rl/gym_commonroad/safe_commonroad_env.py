@@ -37,7 +37,6 @@ class SafetyVerifier:
 
     def __init__(self, scenario: Scenario, prop_ego, precomputed_lane_polygons, dense_lanes):
         self.scenario = scenario
-        print(scenario.scenario_id)
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
         self.safe_set : List[Tuple[List[Tuple[int,int,float,float,float]],Lanelet]] = []
@@ -131,6 +130,11 @@ class SafetyVerifier:
                 lso = self.sort_obstacles_in_lane(ls.lanelet_id, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
                 pts = self.obs_start_end_index(lso[0],ls.lanelet_id)
+                if pts is None:
+                    ct,_,_ = self.precomputed_lane_polygons[ls.lanelet_id]
+                    p = lobs_state.position
+                    s,_ = ct.convert_to_curvilinear_coords(p[0],p[1])
+                    return lobs_state.velocity, s
                 return lobs_state.velocity, traveled_distance(self.dense_lanes[ls.lanelet_id][1],
                                                               self.dense_lanes[ls.lanelet_id][1][pts[0]])
         if len(successors) == 1:
@@ -471,9 +475,9 @@ class SafetyLayer(CommonroadEnv):
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
-        print("in reset")
         self.past_ids = []
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
+        print(self.observation_collector._scenario.scenario_id)
         self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
@@ -570,9 +574,6 @@ class SafetyLayer(CommonroadEnv):
             center_dense = np.delete(center_dense, to_remove, axis=0)
             right_dense = np.delete(right_dense, to_remove, axis=0)
             left_dense = np.delete(left_dense, to_remove, axis=0)
-            print(type(left_dense))
-            print(type(right_dense))
-            print(type(center_dense))
             if type(center_dense) is not np.ndarray:
                 print("Center dense is not a numpy array")
                 print(l.center_vertices)
@@ -604,7 +605,9 @@ class SafetyLayer(CommonroadEnv):
             if a<=b:
                 action[0] = max(0,a)
                 reward_for_safe_action = 0.5
+                print("half safe action")
             else:
+                print("unsafe action")
                 if in_conflict:
                     action[0] = self.compute_steering_velocity(self.compute_steering_velocity(
                         self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1]))
@@ -644,6 +647,7 @@ class SafetyLayer(CommonroadEnv):
         if terminated:
             print(info)
             print(self.termination_reason)
+        print(self.observation_collector._ego_state.position)
         print("")
         return observation_vector, reward, terminated, truncated, info
 
