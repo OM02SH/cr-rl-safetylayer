@@ -210,7 +210,7 @@ class SafetyVerifier:
             if traveled_distance(center,center[pts[0]]) < self.prop_ego["ego_length"]:
                 C.append(self.get_end_collision_free_area(lane, center, [0,pts[0]],preceding_v))
             else:
-                C.append((cps[0 : pts[0]+1],lane, 0.0, preceding_v, 0.0))
+                C.append((center[0 : pts[0]+1],lane, 0.0, preceding_v, 0.0))
         return C
 
     def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle]) -> List[Obstacle]:
@@ -629,6 +629,9 @@ class SafetyLayer(CommonroadEnv):
         self.observation["final_priority"] = np.array([self.final_priority], dtype= object)
         #for k in self.observation.keys():   print(k, " : ", self.observation[k])
         observation_vector = self.pack_observation(observation)
+        if terminated:
+            print(info)
+            print(self.termination_reason)
         return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
