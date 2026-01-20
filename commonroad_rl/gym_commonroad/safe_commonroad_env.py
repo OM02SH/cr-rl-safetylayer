@@ -3,6 +3,8 @@ from collections import defaultdict
 import numpy as np
 from typing import List, Tuple, Optional, Union, Dict
 
+from casadi.tools.structure3 import isIterable
+from commonroad_rl.temp import center_dense
 from gymnasium import spaces
 from shapely.geometry import Polygon, LineString
 from shapely.affinity import rotate, translate
@@ -18,7 +20,7 @@ from commonroad_clcs.clcs import CurvilinearCoordinateSystem
 from commonroad_clcs.config import CLCSParams
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
-from commonroad.geometry.polyline_util import resample_polyline_with_distance
+from scipy.interpolate import interp1d
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
 
 def traveled_distance(curve: np.ndarray, target):
@@ -37,7 +39,6 @@ class SafetyVerifier:
     def __init__(self, scenario: Scenario, prop_ego, precomputed_lane_polygons, dense_lanes):
         self.scenario = scenario
         print(scenario.scenario_id)
-        self.v_max = 45
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
         self.safe_set : List[Tuple[List[Tuple[int,int,float,float,float]],Lanelet]] = []
@@ -66,11 +67,8 @@ class SafetyVerifier:
             return dx * c - dy * s, dx * s + dy * c
         local = np.array([rotate(px, py) for px, py in curve])
         l, w = length / 2, width / 2
-        rect = np.array([
-            [-l, -w], [l, -w],
-            [l, -w], [l, w],
-            [l, w], [-l, w],
-            [-l, w], [-l, -w]   ])
+        rect = np.array([ [-l, -w], [l, -w],[l, -w], [l, w],
+                [l, w], [-l, w],[-l, w], [-l, -w]   ])
         def segment_intersect(p1, p2, q1, q2):
             def ccw(a, b, c):
                 return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
@@ -83,8 +81,7 @@ class SafetyVerifier:
                 if segment_intersect(p1, p2, q1, q2):
                     hits.append(i)
                     break
-        if not hits:
-            return None
+        if not hits:    return None
         return hits[:2]
 
     @staticmethod
@@ -124,53 +121,59 @@ class SafetyVerifier:
     def get_end_collision_free_area(self, lane : Lanelet, center, pt : list[int], preceding_v):
         successors = lane.successor
         if len(successors) == 0:
-            return center[pt[1] : len(center)], lane, preceding_v, self.v_max , 0
+            return center[pt[1] : len(center)], lane, preceding_v, self.prop_ego["v_max"] , 0
         def get_closest_obstacle_lane_velocity_distance(ls: Lanelet):
             lso = ls.get_obstacles(self.scenario.obstacles, self.time_step)
             if len(lso) == 0:
                 r_min = 1.0 / self.kappa(self.dense_lanes[ls.lanelet_id][1])
                 v_crit = np.sqrt(r_min * self.prop_ego["a_lat_max"])
-                return v_crit, traveled_distance(self.dense_lanes[ls.lanelet_id][1], self.dense_lanes[ls.lanelet_id][1][-1])
+                return min(v_crit,self.prop_ego["v_max"]), traveled_distance(self.dense_lanes[ls.lanelet_id][1], self.dense_lanes[ls.lanelet_id][1][-1])
             else:
                 lso = self.sort_obstacles_in_lane(ls.lanelet_id, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
                 pts = self.obs_start_end_index(lso[0],ls.lanelet_id)
-                print(self.dense_lanes[ls.lanelet_id][1])
-                return lobs_state.velocity, traveled_distance(self.dense_lanes[ls.lanelet_id][1], self.dense_lanes[ls.lanelet_id][1][pts[0]])
+                return lobs_state.velocity, traveled_distance(self.dense_lanes[ls.lanelet_id][1],
+                                                              self.dense_lanes[ls.lanelet_id][1][pts[0]])
         if len(successors) == 1:
             v,d = get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successors[0]))
+            print("one succesor closset speed : ", v)
         else:
             s_v_d = []
             for successor in successors:
-                s_v_d.append((successor, get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successor))))
+                v_i,d_i = get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successor))
+                print("clossest speed : " , v_i)
+                s_v_d.append((successor, v_i, d_i))
             min_ttc = math.inf
             closest_car = s_v_d[0][0]
-            for lane_id, (v_i, d_i) in s_v_d:
-                relative_speed = self.v_max - v_i
+            for lane_id, v_i, d_i in s_v_d:
+                relative_speed = self.prop_ego["v_max"] - v_i
                 if relative_speed <= 0: continue
                 ttc = d_i / relative_speed
                 if ttc < min_ttc:
                     min_ttc = ttc
                     closest_car = lane_id
             v,d = 0, 0
-            for lane_id, (v_i, d_i) in s_v_d:
+            for lane_id, v_i, d_i in s_v_d:
                 if lane_id == closest_car:
                     d = d_i
                     v = v_i
         return center[pt[1] : len(center)], lane, preceding_v, v , d
 
     def get_lane_collision_free_areas(self, lane : Lanelet):
+        print("get_lane_collision_free_areas")
         C = []
         center = self.dense_lanes[lane.lanelet_id][1]
         obs = lane.get_obstacles(self.scenario.obstacles, self.time_step)
-        l_id = lane.adj_left if lane.adj_left_same_direction else None
-        r_id = lane.adj_right if lane.adj_right_same_direction else None
         # empty lane with no vehicle entering or exiting it
         if len(obs) == 0:
             print("Real Empty lane")
             return [self.get_end_collision_free_area(lane, center, [0,0], 0)]
         i = 0
+        print("obs before sorting")
+        print(obs)
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
+        print("obs after sorting")
+        print(obs)
         obs_state = obs[i].state_at_time(self.time_step)
         pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
         while pts is None:
@@ -179,12 +182,15 @@ class SafetyVerifier:
                 for o in obs: print(o)
                 # print(center)
                 print("noooooooooooooooooo")
-                return [(center, lane, 0.0, self.v_max, 0.0)]
+                return [(center, lane, 0.0, self.prop_ego["v_max"], 0.0)]
             obs_state = obs[i].state_at_time(self.time_step)
             pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
         preceding_v = obs_state.velocity
-        if len(pts) == 1:   pt = pts[0]
+        if len(pts) == 1:
+            pt = pts[0]
+            print("first obs points 1")
         else:
+            print("first obs points 2")
             cps = center[0 : pts[0] + 1]
             C.append((cps,lane, 0.0, preceding_v, 0.0)) # add first collision free area
             pt = pts[1]
@@ -197,13 +203,15 @@ class SafetyVerifier:
                 pt = pts[1]
             preceding_v = obs_state.velocity
         if len(pts) == 2 and ((lane.lanelet_id == self.ego_lanelet.lanelet_id) |
-                              (l_id is not None and l_id == lane.lanelet_id) |
-                              (r_id is not None and r_id == lane.lanelet_id)):
+                              (self.l_id is not None and self.l_id == lane.lanelet_id) |
+                              (self.r_id is not None and self.r_id == lane.lanelet_id)):
             # add last collision free area only for the ego and adjacent lanes
-            C.append(self.get_end_collision_free_area(lane, center, pt, preceding_v))
-        print("collision free area")
-        print("------------------------------------------------------------------")
-        print(C)
+            C.append(self.get_end_collision_free_area(lane, center, pts, preceding_v))
+        if len(C) == 0:
+            if traveled_distance(center,center[pts[0]]) < self.prop_ego["ego_length"]:
+                C.append(self.get_end_collision_free_area(lane, center, [0,pts[0]],preceding_v))
+            else:
+                C.append((cps[0 : pts[0]+1],lane, 0.0, preceding_v, 0.0))
         return C
 
     def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle]) -> List[Obstacle]:
@@ -236,28 +244,30 @@ class SafetyVerifier:
         """
         print(xi , "   ",yi, "   ",v_i, "   ",xj, "   ",yj, "   ",v_j)
         ct,_,_ = self.precomputed_lane_polygons[l_id]
-        tc = ct.reference_path()
-        # print(tc)
-        # for c in cp:    tc.append(ct.convert_to_curvilinear_coords(*c))
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
         txj += distance_to_add
         a_lat_max, a_lon_max, w, l, delta_react = (self.prop_ego["a_lat_max"], self.prop_ego["a_lon_max"],
                 self.prop_ego["ego_width"], self.prop_ego["ego_length"], self.prop_ego["delta_react"])
         k = self.kappa(cp)
-        if k == 0:
-            r_min = math.inf
-        else:
-            r_min = 1.0 / k
-        v_crit = np.sqrt(r_min * a_lat_max)
+        if k == 0:  r_min = math.inf
+        else:   r_min = 1.0 / k
+        v_crit = min(np.sqrt(r_min * a_lat_max),self.prop_ego["v_max"])
         # s >= s_i + Δ_safe(v, i)
         # s <= s_j - Δ_safe(v, j)
-        vs = np.linspace(0, min(v_crit, self.v_max), 50)
-        s_centers = np.array([s for (s, d) in tc]) # d is always 0
+        vs = np.linspace(0, v_crit, 50)
+        s_centers = np.array([])
+        for x,y in self.dense_lanes[l_id][1]:
+            try:
+                s, d = ct.convert_to_curvilinear_coords(x,y)
+                s_centers = np.append(s_centers, s)
+            except CartesianProjectionDomainError:
+                print("error in converting")
+                pass
         safe_states = []
         # a_lon(v) = a_lon_max * sqrt( 1 - (v^2 / v_crit^2)^2 )
         def a_lon(v, a_lon_max, v_crit ):
-            return a_lon_max * np.sqrt(max(0, 1 - (v ** 2 / v_crit ** 2) ** 2))
+            return a_lon_max * np.sqrt(max(0.01, 1 - (v ** 2 / v_crit ** 2) ** 2))
         # z(v,j) = v^2/(2 a_ego(v)) - v_j^2/(2 a_j_max) + delta_react*v
         def zeta_preceding(v, v_j, a_lon_max, v_crit, delta_react):
             return (v ** 2) / (2 * abs(a_lon(v,a_lon_max,v_crit))) - (v_j ** 2) / (2 * abs(a_lon_max)) + delta_react * v
@@ -284,7 +294,7 @@ class SafetyVerifier:
 
     def union_safe_set(self, ll: Lanelet, safe_set_list_left : List[Tuple[int,int,float,float,float]]
                             , rl : Lanelet, safe_set_list_right :List[Tuple[int,int,float,float,float]]):
-        (ct, _, _) = self.precomputed_lane_polygons[ll.lanelet_id]
+        ct, _, _ = self.precomputed_lane_polygons[ll.lanelet_id]
         nls = []
         nrs = []
         for s in safe_set_list_left:
@@ -321,6 +331,8 @@ class SafetyVerifier:
                     - Lane
         """
         self.ego_lanelet = ego_lanelet
+        self.l_id = self.ego_lanelet.adj_left if self.ego_lanelet.adj_left_same_direction else None
+        self.r_id = self.ego_lanelet.adj_right if self.ego_lanelet.adj_right_same_direction else None
         self.time_step += 1
         self.in_or_entering_intersection = in_or_entering_intersection
         S : List[Tuple[List[Tuple[np.ndarray,np.ndarray,float,float,float]],Lanelet]] = []
@@ -382,18 +394,18 @@ class SafetyVerifier:
                         if start == end : continue
                         if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
-                            print(type(left_points), type(right_points))
-                            if type(left_points[0]) != np.ndarray:
-                                print("invalid left points lane : ", lane.lanelet_id)
-                                exit(1)
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
-                            for i in range(len(left_bound)):
-                                #print(type(left_bound[i]))
-                                #print(type(right_bound[i]))
-                                left_bound[i] = np.array(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1]))
-                                right_bound[i] = np.array(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1]))
-                            lane_polygon = Polygon(left_bound + right_bound[::-1])
+                            lb,rb = [], []
+                            i = 0
+                            while i < len(left_bound):
+                                try :
+                                    lb.append(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1]))
+                                    rb.append(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1]))
+                                except CartesianProjectionDomainError:
+                                    pass
+                                i+=1
+                            lane_polygon = Polygon(lb + rb[::-1])
                             if lane_polygon.contains(rect): return True
                             # allow intersections with the end and start of the lane for lane change
                             return not(LineString(left_bound).intersects(rect) or LineString(right_bound).intersects(rect))
@@ -411,13 +423,14 @@ class SafetyLayer(CommonroadEnv):
                  config_file=PATH_PARAMS["configs"]["commonroad-v1"], logging_mode=1, **kwargs) -> None:
         super().__init__(meta_scenario_path, train_reset_config_path, test_reset_config_path, visualization_path,
                          logging_path, test_env, play, config_file, logging_mode, **kwargs)
+        print("init")
         self.observation = None
         self.past_ids = []
         self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.lane_width = 5
         self.last_relative_heading = 0
-        self.v_max = 45
+        self.prop_ego["v_max"] = 45
         self.final_priority = -1
         self.intersection_lanes : List[Lanelet] = []
         self.conflict_lanes : defaultdict[int, List[Tuple[Lanelet, bool]]] = defaultdict(list)
@@ -459,6 +472,7 @@ class SafetyLayer(CommonroadEnv):
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
+        print("in reset")
         self.past_ids = []
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
         self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
@@ -504,7 +518,6 @@ class SafetyLayer(CommonroadEnv):
                 except np.linalg.LinAlgError:
                     return False
                 return False
-
             for i in range(len(a) - 1):
                 for j in range(len(b) - 1):
                     if segment_intersection(a[i], a[i + 1], b[j], b[j + 1]):
@@ -518,90 +531,46 @@ class SafetyLayer(CommonroadEnv):
         self.precomputed_lane_polygons.clear()
         self.dense_lanes.clear()
         self.conflict_lanes.clear()
+        def densify_lane_and_normalize(center, left, right, ds=0.1):
+            def arclength_parametrize(poly):
+                d = np.linalg.norm(np.diff(poly, axis=0), axis=1)
+                d[d < 1e-6] = 0.0
+                s = np.insert(np.cumsum(d), 0, 0.0)
+                s += np.arange(len(s)) * 1e-9  # enforce strict monotonicity
+                return s, poly
+            s_c, c = arclength_parametrize(center)
+            s_l, l = arclength_parametrize(left)
+            s_r, r = arclength_parametrize(right)
+            s_new = np.arange(0, s_c[-1], ds)
+            def interp_curve(s_old, curve):
+                fx = interp1d(s_old, curve[:, 0], kind="linear", fill_value="extrapolate")
+                fy = interp1d(s_old, curve[:, 1], kind="linear", fill_value="extrapolate")
+                return np.column_stack((fx(s_new), fy(s_new)))
+            center_new = interp_curve(s_c, c)
+            left_new = interp_curve(s_l, l)
+            right_new = interp_curve(s_r, r)
+            t = np.diff(center_new, axis=0)
+            n = np.column_stack((-t[:, 1], t[:, 0]))
+            n /= np.linalg.norm(n, axis=1, keepdims=True)
+            for i in range(len(n)):
+                left_new[i] = center_new[i] + np.dot(left_new[i] - center_new[i], n[i]) * n[i]
+                right_new[i] = center_new[i] + np.dot(right_new[i] - center_new[i], n[i]) * n[i]
+            return center_new, left_new, right_new
         for l in self.scenario.lanelet_network.lanelets:
-            def extend_centerline(center, left_pts, right_pts):
-                vec = center[0] - center[1]
-                points = np.vstack([left_pts[0], right_pts[0]])
-                distances = np.dot((points - center[0]), vec / np.linalg.norm(vec))
-                ext_len = max(0, -min(distances))
-                ext = center[0] + vec / np.linalg.norm(vec) * ext_len
-                print(ext)
-                center = np.vstack([ext, center])
-
-                vec = center[-1] - center[-2]
-                points = np.vstack([left_pts[-1], right_pts[-1]])
-                distances = np.dot((points - center[-1]), vec / np.linalg.norm(vec))
-                ext_len = max(0, max(distances))
-                ext = center[-1] + vec / np.linalg.norm(vec) * ext_len
-                print(ext)
-                center = np.vstack([center, ext])
-                return center
-
-            def extend_centerline_for_all_lateral(center: np.ndarray,
-                                                  left_pts: np.ndarray,
-                                                  right_pts: np.ndarray):
-                center_ext = center.copy()
-                # Function to extend a segment if lateral points are beyond it
-                def extend_segment(start_idx, vec, lateral_points):
-                    points = lateral_points[start_idx]
-                    distance = np.dot(points - center_ext[start_idx], vec / np.linalg.norm(vec))
-                    if start_idx == 0:
-                        # extend backward
-                        ext_len = -min(0, distance)
-                        if ext_len > 0:
-                            ext = center_ext[0] - vec / np.linalg.norm(vec) * ext_len
-                            center_ext[0] = ext  # move start point backward
-                    else:
-                        # extend forward
-                        ext_len = max(0, distance)
-                        if ext_len > 0:
-                            ext = center_ext[-1] + vec / np.linalg.norm(vec) * ext_len
-                            center_ext[-1] = ext  # move end point forward
-
-                # --- Check all points along the lane ---
-                for i in [0, -1]:  # first and last index
-                    vec_start = center_ext[1] - center_ext[0]
-                    vec_end = center_ext[-1] - center_ext[-2]
-                    extend_segment(0, vec_start, np.vstack([left_pts[0], right_pts[0]]))
-                    extend_segment(-1, vec_end, np.vstack([left_pts[-1], right_pts[-1]]))
-                return center_ext
-            right_dense = resample_polyline_with_distance(l.right_vertices,0.1)
-            left_dense = resample_polyline_with_distance(l.left_vertices,0.1)
-            center_dense = extend_centerline(resample_polyline_with_distance
-                                (l.center_vertices,0.1),left_dense,right_dense)
-            #print(type(center_dense))
-            self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
+            center_dense,right_dense,left_dense = densify_lane_and_normalize(l.center_vertices,l.left_vertices,l.right_vertices)
             ct = CurvilinearCoordinateSystem(center_dense, CLCSParams())
-            x,y = 0,0
-            left = []
-            right = []
-            for x,y in left_dense:
+            left, right = [], []
+            to_remove = []
+            for i in range(len(left_dense)):
                 try:
-                    left.append(np.array(ct.convert_to_curvilinear_coords(x,y)))
+                    left.append(np.array(ct.convert_to_curvilinear_coords(left_dense[i][0], left_dense[i][1])))
+                    right.append(np.array(ct.convert_to_curvilinear_coords(right_dense[i][0], right_dense[i][1])))
                 except CartesianProjectionDomainError:
-                    print("Error in lane : " , l.lanelet_id)
-                    pass
-            for x,y in right_dense:
-                try:
-                    right.append(np.array(ct.convert_to_curvilinear_coords(x,y)))
-                except CartesianProjectionDomainError:
-                    print("Error in lane : " , l.lanelet_id)
-                    pass
-            #try:
-            #    left = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in left_dense])
-            #    right = np.array([ct.convert_to_curvilinear_coords(x, y) for x, y in right_dense])
-            #    print(left)
-            #    print(right)
-            #except CartesianProjectionDomainError:
-            #    pass
-                #print("left: ", l.left_vertices)
-                #print("center: ", l.center_vertices)
-                #print("right: ", l.right_vertices)
-                #print("dense center: ", center_dense[0], "  -  " , center_dense[-1])
-                #print("Error point : ",x, "  ",y)
-            # Extend first/last points to handle boundary
-            #left = np.vstack([left[0] - 1000, left, left[-1] + 1000])
-            #right = np.vstack([right[0] - 1000, right, right[-1] + 1000])
+                    to_remove.append(i)
+            center_dense = np.delete(center_dense, to_remove, axis=0)
+            right_dense = np.delete(right_dense, to_remove, axis=0)
+            left_dense = np.delete(left_dense, to_remove, axis=0)
+            self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             left = np.array(left)
             right = np.array(right)
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, left, right)
@@ -744,8 +713,6 @@ class SafetyLayer(CommonroadEnv):
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
         low, high = -1, 1
-        #print("action : " , self.ego_action)
-        print("steering velocity : ", sv)
         while high - low > 1e-5:
             mid = (low + high) / 2
             if self.safety_verifier.safe_action_check(mid, sv, self.ego_action):   high = mid
