@@ -586,7 +586,7 @@ class SafetyLayer(CommonroadEnv):
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
                 if l.lanelet_id == k.lanelet_id or (l.predecessor and k.predecessor and l.predecessor == k.predecessor) \
-                    or k.lanelet_id in l.adjacent_left or k.lanelet_id in l.adjacent_right :
+                    or k.lanelet_id == l.adj_left or k.lanelet_id == l.adj_right :
                     continue
                 if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
                     self.conflict_lanes[l.lanelet_id].append((k,
