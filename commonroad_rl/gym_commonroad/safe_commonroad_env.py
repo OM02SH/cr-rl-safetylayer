@@ -370,10 +370,10 @@ class SafetyVerifier:
                         rs.extend(k)
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
-        print("Printing Safe sets : ")
+        """print("Printing Safe sets : ")
         print("--------------------------------------------------------------------------------------------------------------")
         print(S)
-        print("--------------------------------------------------------------------------------------------------------------")
+        print("--------------------------------------------------------------------------------------------------------------")"""
 
     def safe_action_check(self, a, sv, ego_action : Action):
         curr_vehicle: ContinuousVehicle = ego_action.vehicle
