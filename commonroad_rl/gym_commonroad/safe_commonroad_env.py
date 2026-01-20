@@ -585,7 +585,8 @@ class SafetyLayer(CommonroadEnv):
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, left, right)
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
-                if l == k or (l.predecessor and k.predecessor and l.predecessor == k.predecessor):
+                if l.lanelet_id == k.lanelet_id or (l.predecessor and k.predecessor and l.predecessor == k.predecessor) \
+                    or k.lanelet_id in l.adjacent_left or k.lanelet_id in l.adjacent_right :
                     continue
                 if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
                     self.conflict_lanes[l.lanelet_id].append((k,
@@ -596,6 +597,7 @@ class SafetyLayer(CommonroadEnv):
         in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         in_intersection = True if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys() else False
         if self.safety_verifier.safe_action_check(action[1],action[0], self.ego_action):
+            print("safe action")
             reward_for_safe_action = 1
         else:
             a,b =  self.find_safe_acceleration(action[1])
