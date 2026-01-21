@@ -137,7 +137,7 @@ class SafetyVerifier:
                 lso = self.sort_obstacles_in_lane(ls.lanelet_id, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
                 pts = self.obs_start_end_index(lso[0],ls.lanelet_id)
-                if pts is []:
+                if not pts:
                     s_centers = self.precomputed_lane_polygons[ls.lanelet_id][1]
                     p = np.asarray(lobs_state.position).reshape(1, 2)
                     closest_centerpoint = np.linalg.norm(self.dense_lanes[ls.lanelet_id][1] - p, axis=1).argmin()
