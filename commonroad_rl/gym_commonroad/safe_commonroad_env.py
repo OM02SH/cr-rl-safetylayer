@@ -769,7 +769,7 @@ class SafetyLayer(CommonroadEnv):
         print(sv)
         def normalize_steering_velocity(self, sv_phys):
             max_sv_phys = 0.4
-            sv_clipped = np.clip(sv_phys, -max_sv_phys, max_sv_phys)
+            sv_clipped = np.clip(sv_phys, -max_sv_phys, max_sv_phys)/math.pi
             sv_normalized = (sv_clipped / max_sv_phys) * 1000
             return int(sv_normalized)
         res = (normalize_steering_velocity(sv[0]) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
