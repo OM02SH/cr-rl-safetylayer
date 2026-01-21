@@ -766,7 +766,7 @@ class SafetyLayer(CommonroadEnv):
         desired_angle,_,_ = self.stanley_controller.stanley_control(p[0],p[1],yaw,v,steering_angle,cx,cy,path_yaw)
         sv = (desired_angle - steering_angle)
         print("steering verlocity : ", sv)
-        return (float(np.clip(sv, -0.4, 0.4)) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
+        return (float(np.clip(sv, -0.4, 0.4))/0.4) 
 
     def find_safe_acceleration(self, sv):
         """
