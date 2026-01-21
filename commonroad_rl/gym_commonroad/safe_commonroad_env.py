@@ -399,7 +399,7 @@ class SafetyVerifier:
                 if lane.lanelet_id == l.lanelet_id:
                     for start, end, v, dl, dr in k:
                         if start == end : continue
-                        if not v - 0.5 <= nv <= v + 0.5:    continue
+                        if not v - 1 <= nv <= v + 1:    continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
