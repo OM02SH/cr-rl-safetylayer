@@ -270,6 +270,7 @@ class ContinuousAction(Action):
         :return: New state of ego vehicle
         """
         rescaled_action = self.rescale_action(action)
+        print(rescaled_action)
         new_state = self.vehicle.get_new_state(rescaled_action, self.action_base)
         self.vehicle.set_current_state(new_state)
         if self.vehicle.vehicle_model == VehicleModel.YawRate:
