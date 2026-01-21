@@ -49,7 +49,7 @@ gym.envs.registration.register(
     id="commonroad-v1-safe",
     entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
 )
-print("regestered gym environment")
+
 import gymnasium as gym
 # from stable_baselines.bench import Monitor
 from stable_baselines3.common.monitor import Monitor
@@ -64,7 +64,7 @@ training_env = gym.make("commonroad-v1-safe",
                         meta_scenario_path=meta_scenario_path,
                         train_reset_config_path= training_data_path,
                         **env_configs)
-print("training environment")
+
 # Wrap the environment with a monitor to keep an record of the learning process
 info_keywords=tuple(["is_collision", \
                      "is_time_out", \
@@ -77,7 +77,7 @@ training_env = Monitor(training_env, log_path + "0", info_keywords=info_keywords
 def make_training_env():
     return training_env
 training_env = DummyVecEnv([make_training_env])
-print("training environment")
+
 # Normalize observations and rewards
 training_env = VecNormalize(training_env, norm_obs=True, norm_reward=True)
 
@@ -141,7 +141,7 @@ eval_callback = EvalCallback(testing_env,
                              callback_on_new_best=save_vec_normalize_callback,
                              verbose=1)
 # print("stop_training status:", eval_callback.)
-print("all inits done")
+
 #import numpy as np
 #import commonroad_clcs.pycrccosy as pycrccosy
 #import matplotlib.pyplot as plt
