@@ -39,7 +39,7 @@ class SafetyVerifier:
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
         self.safe_set : List[Tuple[List[Tuple[int,int,float,float,float]],Lanelet]] = []
-        self.precomputed_lane_polygons : Dict[int, CurvilinearCoordinateSystem ,np.ndarray ,np.ndarray] = precomputed_lane_polygons
+        self.precomputed_lane_polygons : Dict[int, CurvilinearCoordinateSystem, np.array, np.ndarray, np.ndarray] = precomputed_lane_polygons
         self.time_step = -1
         self.lane_width = 5
         self.ego_lanelet = None
@@ -132,9 +132,10 @@ class SafetyVerifier:
                 lobs_state = lso[0].state_at_time(self.time_step)
                 pts = self.obs_start_end_index(lso[0],ls.lanelet_id)
                 if pts is None:
-                    ct,_,_ = self.precomputed_lane_polygons[ls.lanelet_id]
-                    p = lobs_state.position
-                    s,_ = ct.convert_to_curvilinear_coords(p[0],p[1])
+                    _, s_centers, _, _ = self.precomputed_lane_polygons[ls.lanelet_id]
+                    p = np.asarray(lobs_state.position).reshape(1, 2)
+                    closest_centerpoint = np.linalg.norm(self.dense_lanes[ls.lanelet_id][1] - p, axis=1).argmin()
+                    s = s_centers[closest_centerpoint]
                     return lobs_state.velocity, s, True
                 return lobs_state.velocity, traveled_distance(self.dense_lanes[ls.lanelet_id][1],
                                                               self.dense_lanes[ls.lanelet_id][1][pts[0]]), True
@@ -185,15 +186,16 @@ class SafetyVerifier:
         print(obs)
         obs_state = obs[i].state_at_time(self.time_step)
         pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
-        while pts is None:
-            i += 1
-            if len(obs) == i:
-                for o in obs: print(o)
-                # print(center)
-                print("noooooooooooooooooo")
-                return [(center, lane, 0.0, self.prop_ego["v_max"], 0.0)]
-            obs_state = obs[i].state_at_time(self.time_step)
-            pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
+        if pts is None:
+            _, s_centers, _, _ = self.precomputed_lane_polygons[lane.lanelet_id]
+            p = np.asarray(obs_state.position).reshape(1, 2)
+            closest_centerpoint = np.linalg.norm(self.dense_lanes[lane.lanelet_id][1] - p, axis=1).argmin()
+            s = s_centers[closest_centerpoint]
+            start = s + obs[0].obstacle_shape.length/2
+            end = s - obs[0].obstacle_shape.length/2
+            if start == end: pts = [np.linalg.norm(s_centers - start, axis=1).argmin()]
+            else: pts = [np.linalg.norm(s_centers - start, axis=1).argmin(),
+                   np.linalg.norm(s_centers - end, axis=1).argmin()]
         preceding_v = obs_state.velocity
         if len(pts) == 1:
             pt = pts[0]
@@ -226,7 +228,7 @@ class SafetyVerifier:
 
     def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle]) -> List[Obstacle]:
         obs_with_center : List[Tuple[Obstacle, float]] = []
-        ct, _, _ = self.precomputed_lane_polygons[l_id]
+        ct, _, _, _ = self.precomputed_lane_polygons[l_id]
         for ob in obs:
             pos = (ob.state_at_time(self.time_step).position[0], ob.state_at_time(self.time_step).position[1])
             try:
@@ -253,7 +255,7 @@ class SafetyVerifier:
                - d -> The Area to leave on edges for safe bounds in the lane
         """
         print(xi , "   ",yi, "   ",v_i, "   ",xj, "   ",yj, "   ",v_j)
-        ct,_,_ = self.precomputed_lane_polygons[l_id]
+        ct, s_centers, _, _ = self.precomputed_lane_polygons[l_id]
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
         txj += distance_to_add
@@ -266,14 +268,6 @@ class SafetyVerifier:
         # s >= s_i + Δ_safe(v, i)
         # s <= s_j - Δ_safe(v, j)
         vs = np.linspace(0, v_crit, 50)
-        s_centers = np.array([])
-        for x,y in self.dense_lanes[l_id][1]:
-            try:
-                s, d = ct.convert_to_curvilinear_coords(x,y)
-                s_centers = np.append(s_centers, s)
-            except CartesianProjectionDomainError:
-                print("error in converting")
-                pass
         safe_states = []
         # a_lon(v) = a_lon_max * sqrt( 1 - (v^2 / v_crit^2)^2 )
         def a_lon(v, a_lon_max, v_crit ):
@@ -304,14 +298,13 @@ class SafetyVerifier:
 
     def union_safe_set(self, ll: Lanelet, safe_set_list_left : List[Tuple[int,int,float,float,float]]
                             , rl : Lanelet, safe_set_list_right :List[Tuple[int,int,float,float,float]]):
-        ct, _, _ = self.precomputed_lane_polygons[ll.lanelet_id]
+        ct,ls, _, _ = self.precomputed_lane_polygons[ll.lanelet_id]
         nls = []
         nrs = []
         for s in safe_set_list_left:
             c1, c2, lv, dl, _ = s
-            _, lcp, _ = self.dense_lanes[ll.lanelet_id]
-            l_start, _ = ct.convert_to_curvilinear_coords(lcp[c1][0],lcp[c1][1])
-            l_end, _ = ct.convert_to_curvilinear_coords(lcp[c2][0],lcp[c2][1])
+            l_start = ls[c1]
+            l_end = ls[c2]
             for c in safe_set_list_right:
                 c1, c2, rv, _, dr = c
                 _, rcp, _ = self.dense_lanes[rl.lanelet_id]
@@ -396,7 +389,7 @@ class SafetyVerifier:
         rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
         rect = translate(rect, xoff=p[0], yoff=p[1])
         for l in self.get_reachable_lanes():
-            ct,lp,rp = self.precomputed_lane_polygons[l.lanelet_id]
+            ct, _, lp, rp = self.precomputed_lane_polygons[l.lanelet_id]
             for s in self.safe_set:
                 k, lane = s
                 if lane.lanelet_id == l.lanelet_id:
@@ -488,8 +481,7 @@ class SafetyLayer(CommonroadEnv):
         self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
-        ct ,_ ,_ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
-        center_points = ct.reference_path_original()
+        _, center_points, _ = self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id]
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons, self.dense_lanes)
@@ -599,7 +591,15 @@ class SafetyLayer(CommonroadEnv):
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             left = np.array(left)
             right = np.array(right)
-            self.precomputed_lane_polygons[l.lanelet_id] = (ct, left, right)
+            s_centers = np.array([])
+            for x, y in center_dense:
+                try:
+                    s, d = ct.convert_to_curvilinear_coords(x, y)
+                    s_centers = np.append(s_centers, s)
+                except CartesianProjectionDomainError:
+                    print("error in converting")
+                    pass
+            self.precomputed_lane_polygons[l.lanelet_id] = (ct, s_centers, left, right)
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
                 if l.lanelet_id == k.lanelet_id or (l.predecessor and k.predecessor and l.predecessor == k.predecessor) \
@@ -638,8 +638,7 @@ class SafetyLayer(CommonroadEnv):
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
         else:   reward -= 800
-        ct, _, _ = self.precomputed_lane_polygons[self.observation_collector.ego_lanelet.lanelet_id]
-        center_points = ct.reference_path_original()
+        _, center_points, _ = self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id]
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1, 2)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.observation = observation
