@@ -769,9 +769,11 @@ class SafetyLayer(CommonroadEnv):
         print(sv)
         from commonroad_rl.gym_commonroad.action.action import ContinuousAction
         a : ContinuousAction = None
-        print(self.ego_action.rescale_action(1))
-        print(self.ego_action.rescale_action(-1))
-        print(self.ego_action.rescale_action(0))
+        print(self.ego_action.rescale_action([1, 1]))
+        print(self.ego_action.rescale_action([1, -1]))
+        print(self.ego_action.rescale_action([-1, 1]))
+        print(self.ego_action.rescale_action([-1, -1]))
+        print(self.ego_action.rescale_action([0, 0]))
         return (float(np.clip(sv, -1.066, 1.066)) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
 
     def find_safe_acceleration(self, sv):
