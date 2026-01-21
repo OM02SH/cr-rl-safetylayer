@@ -642,7 +642,7 @@ class SafetyLayer(CommonroadEnv):
                     action[1] = min(0,a) if self.observation["v_ego"] > 0 else max(0,b)
                 else:
                     action[1] = -1 if self.observation["v_ego"] > 0 else 1
-
+                print("new action : ", action)
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
