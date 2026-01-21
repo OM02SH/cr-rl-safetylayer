@@ -757,7 +757,14 @@ class SafetyLayer(CommonroadEnv):
         kappa_max = self.prop_ego["a_lat_max"] / (v ** 2)
         kappa_ref = np.clip(kappa_ref, -kappa_max, kappa_max)
         kappa = self.observation["slip_angle"]
-        kappa_dot = self.observation["yaw_rate"]
+        kappa_dot = self.observation["global_turn_rate"]
+        """omega_n = 1.5 / dt
+        zeta = 0.7
+
+        kp = omega_n ** 2
+        kd = 2 * zeta * omega_n
+        kp = 4
+        kd = 2"""
         kappa_ddot = 4.0 * (kappa_ref - kappa) - 2.0 * kappa_dot
         return float(np.clip(kappa_ddot / 20, -1.0, 1.0))
 
