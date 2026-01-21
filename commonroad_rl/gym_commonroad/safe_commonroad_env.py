@@ -767,7 +767,7 @@ class SafetyLayer(CommonroadEnv):
         print("steering_angle:",steering_angle)
         sv = (np.clip(desired_angle, -0.5, 0.5) - steering_angle) *10
         print(sv)
-        return (float(np.clip(sv, -0.4, 0.4)) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
+        return (float(np.clip(sv, -1.066, 1.066)) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
 
     def find_safe_acceleration(self, sv):
         """
