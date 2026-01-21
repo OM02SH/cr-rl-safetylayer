@@ -413,13 +413,13 @@ class SafetyVerifier:
                                 except CartesianProjectionDomainError:
                                     pass
                                 i+=1
-                            valid_road_polygons = [Polygon(lb + rb[::-1])]
+                            valid_road_polygons = [Polygon(lb + rb[::-1]).buffer(0)]
                             if end == len(left_bound):
                                 for s_id in lane.successor:
-                                    valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(s_id).polygon.shapely_object)
+                                    valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(s_id).polygon.shapely_object.buffer(0))
                             elif start == 0:
                                 for p_id in lane.predecessor:
-                                    valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object)
+                                    valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
                             lane_polygon = unary_union(valid_road_polygons)
                             return lane_polygon.contains(rect)
                         #print("Tested acceleration with suitable v  : " , a)
