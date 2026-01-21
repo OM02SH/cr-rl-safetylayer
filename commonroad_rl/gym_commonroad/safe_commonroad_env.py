@@ -1,13 +1,13 @@
 import math
 from collections import defaultdict
 import numpy as np
-from typing import List, Tuple, Optional, Union, Dict, Iterable
+from typing import List, Tuple, Optional, Union, Dict
 from scipy.interpolate import interp1d
 
-from shapely.geometry import Polygon, LineString
+from shapely.geometry import Polygon
 from shapely.affinity import rotate, translate
 from shapely.ops import unary_union
-
+import shapely
 from gymnasium import spaces
 
 from commonroad_rl.gym_commonroad.action.action import Action
@@ -118,8 +118,8 @@ class SafetyVerifier:
         if not pts: return None
         start = min(pts)
         end = max(pts)
-        if start == end:    return [start]
-        else:   return [start, end]
+        if start == end:    return np.ndarray([start])
+        else:   return np.ndarray([start, end])
 
     def get_end_collision_free_area(self, lane : Lanelet, center, pt : list[int], preceding_v,depth = 0,max_depth = 3):
         if depth > max_depth:
@@ -189,7 +189,7 @@ class SafetyVerifier:
         #print("obs after sorting")
         #print(obs)
         obs_state = obs[i].state_at_time(self.time_step)
-        pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
+        pts : np.ndarray = self.obs_start_end_index(obs[i], lane.lanelet_id)
         if pts is None:
             s_centers = self.precomputed_lane_polygons[lane.lanelet_id][1]
             p = np.asarray(obs_state.position).reshape(1, 2)
@@ -197,9 +197,9 @@ class SafetyVerifier:
             s = s_centers[closest_centerpoint]
             start = s + obs[0].obstacle_shape.length/2
             end = s - obs[0].obstacle_shape.length/2
-            if start == end: pts = [np.linalg.norm(s_centers - start).argmin()]
-            else: pts = [np.linalg.norm(s_centers - start).argmin(),
-                   np.linalg.norm(s_centers - end).argmin()]
+            if start == end: pts = np.array(np.linalg.norm(s_centers - start).argmin())
+            else: pts = np.array([np.linalg.norm(s_centers - start).argmin(),
+                   np.linalg.norm(s_centers - end).argmin()])
         preceding_v = obs_state.velocity
         if len(pts) == 1:
             pt = pts[0]
@@ -221,7 +221,7 @@ class SafetyVerifier:
                               (self.l_id is not None and self.l_id == lane.lanelet_id) or
                               (self.r_id is not None and self.r_id == lane.lanelet_id)):
             # add last collision free area only for the ego and adjacent lanes
-            C.append(self.get_end_collision_free_area(lane, center, pts, preceding_v))
+            C.append(self.get_end_collision_free_area(lane, center, pts.tolist(), preceding_v))
         if len(C) == 0:
             if traveled_distance(center,center[pts[0]]) < self.prop_ego["ego_length"]:
                 C.append(self.get_end_collision_free_area(lane, center, [0,pts[0]],preceding_v))
@@ -307,8 +307,8 @@ class SafetyVerifier:
         nrs = []
         for s in safe_set_list_left:
             c1, c2, lv, dl, _ = s
-            l_start = ls[c1]
-            l_end = ls[c2]
+            l_start = int(ls[c1])
+            l_end = int(ls[c2])
             for c in safe_set_list_right:
                 c1, c2, rv, _, dr = c
                 _, rcp, _ = self.dense_lanes[rl.lanelet_id]
@@ -342,7 +342,7 @@ class SafetyVerifier:
         self.r_id = self.ego_lanelet.adj_right if self.ego_lanelet.adj_right_same_direction else None
         self.time_step += 1
         self.in_or_entering_intersection = in_or_entering_intersection
-        S : List[Tuple[List[Tuple[np.ndarray,np.ndarray,float,float,float]],Lanelet]] = []
+        S : List[Tuple[List[Tuple[float,float,float,float,float]],Lanelet]] = []
         C = []
         #print("lanes to check")
         #for l in self.get_reachable_lanes():
@@ -420,8 +420,13 @@ class SafetyVerifier:
                             elif start == 0:
                                 for p_id in lane.predecessor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
-                            lane_polygon = unary_union(valid_road_polygons)
-                            return lane_polygon.contains(rect)
+                            lane_polygon = shapely.union_all(valid_road_polygons)
+                            if lane_polygon.contains(rect):
+                                return True
+                            else:
+                                print(lane_polygon.convex_hull)
+                                print(rect.convex_hull)
+                                return False
                         if in_safe_space(lp, rp):   return True
         return False
 
@@ -450,7 +455,7 @@ class SafetyLayer(CommonroadEnv):
         self.pre_intersection_lanes = None
         self.precomputed_lane_polygons = {}
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-        self.safety_verifier : SafetyVerifier = None
+        self.safety_verifier = None
         self.in_or_entering_intersection = False
         self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float32),
                                         np.full(35, -1.0, dtype=np.float32)])
