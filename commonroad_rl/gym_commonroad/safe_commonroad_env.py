@@ -2,10 +2,14 @@ import math
 from collections import defaultdict
 import numpy as np
 from typing import List, Tuple, Optional, Union, Dict, Iterable
+from scipy.interpolate import interp1d
 
-from gymnasium import spaces
 from shapely.geometry import Polygon, LineString
 from shapely.affinity import rotate, translate
+from shapely.ops import unary_union
+
+from gymnasium import spaces
+
 from commonroad_rl.gym_commonroad.action.action import Action
 from commonroad.scenario.lanelet import Lanelet
 from commonroad.scenario.scenario import Scenario
@@ -18,7 +22,6 @@ from commonroad_clcs.clcs import CurvilinearCoordinateSystem
 from commonroad_clcs.config import CLCSParams
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
-from scipy.interpolate import interp1d
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
 
 def traveled_distance(curve: np.ndarray, target):
@@ -410,10 +413,15 @@ class SafetyVerifier:
                                 except CartesianProjectionDomainError:
                                     pass
                                 i+=1
-                            lane_polygon = Polygon(lb + rb[::-1])
-                            if lane_polygon.contains(rect): return True
-                            # allow intersections with the end and start of the lane for lane change
-                            return not(LineString(left_bound).intersects(rect) or LineString(right_bound).intersects(rect))
+                            valid_road_polygons = [Polygon(lb + rb[::-1])]
+                            if end == len(left_bound):
+                                for s_id in lane.successor:
+                                    valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(s_id).polygon)
+                            elif start == 0:
+                                for p_id in lane.predecessor:
+                                    valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon)
+                            lane_polygon = unary_union(valid_road_polygons)
+                            return lane_polygon.contains(rect)
                         #print("Tested acceleration with suitable v  : " , a)
                         if in_safe_space(lp, rp):   return True
         return False
