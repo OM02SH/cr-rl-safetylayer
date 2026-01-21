@@ -769,7 +769,7 @@ class SafetyLayer(CommonroadEnv):
         print(sv)
         res = ((np.clip(sv, -0.4, 0.4) / 0.4) * 1000 - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
         print(res)
-        return res
+        return float(res)
 
     def find_safe_acceleration(self, sv):
         """
