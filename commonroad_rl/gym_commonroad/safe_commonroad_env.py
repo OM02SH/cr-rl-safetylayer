@@ -644,7 +644,15 @@ class SafetyLayer(CommonroadEnv):
                     if in_conflict: action[1] = b
                     else:   action[1] = b if self.observation["a_ego"] > 0 else a
                 else:
-                    print("sttering : ", sv, f"a: {a}, b: {b}")
+                    steering_velocities = np.linspace(-0.8, 0.8, 11) # left, current and right
+                    for sv in steering_velocities:
+                        print(sv)
+                        safe_min, safe_max = self.find_safe_acceleration(sv)
+                        if safe_min <= safe_max:
+                            print(f"safe min: {safe_min}, safe max: {safe_max}")
+                        else:
+                            print("none")
+                    return np.array(At_safe_l, dtype=object)
                 print("new action : ", action)
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
