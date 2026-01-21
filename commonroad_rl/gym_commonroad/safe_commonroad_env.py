@@ -39,7 +39,7 @@ class SafetyVerifier:
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
         self.safe_set : List[Tuple[List[Tuple[int,int,float,float,float]],Lanelet]] = []
-        self.precomputed_lane_polygons : Dict[int, CurvilinearCoordinateSystem, np.array, np.ndarray, np.ndarray] = precomputed_lane_polygons
+        self.precomputed_lane_polygons : Dict[int, CurvilinearCoordinateSystem, np.ndarray, np.ndarray, np.ndarray] = precomputed_lane_polygons
         self.time_step = -1
         self.lane_width = 5
         self.ego_lanelet = None
@@ -132,7 +132,7 @@ class SafetyVerifier:
                 lobs_state = lso[0].state_at_time(self.time_step)
                 pts = self.obs_start_end_index(lso[0],ls.lanelet_id)
                 if pts is None:
-                    _, s_centers, _, _ = self.precomputed_lane_polygons[ls.lanelet_id]
+                    s_centers = self.precomputed_lane_polygons[ls.lanelet_id][1]
                     p = np.asarray(lobs_state.position).reshape(1, 2)
                     closest_centerpoint = np.linalg.norm(self.dense_lanes[ls.lanelet_id][1] - p, axis=1).argmin()
                     s = s_centers[closest_centerpoint]
@@ -152,7 +152,6 @@ class SafetyVerifier:
             else:
                 s_v_d.append((successor, v_i, d_i))
             print("clossest car : ", s_v_d[-1])
-
         min_ttc = math.inf
         closest_car = s_v_d[0][0]
         for lane_id, v_i, d_i in s_v_d:
@@ -187,15 +186,15 @@ class SafetyVerifier:
         obs_state = obs[i].state_at_time(self.time_step)
         pts = self.obs_start_end_index(obs[i], lane.lanelet_id)
         if pts is None:
-            _, s_centers, _, _ = self.precomputed_lane_polygons[lane.lanelet_id]
+            s_centers = self.precomputed_lane_polygons[lane.lanelet_id][1]
             p = np.asarray(obs_state.position).reshape(1, 2)
             closest_centerpoint = np.linalg.norm(self.dense_lanes[lane.lanelet_id][1] - p, axis=1).argmin()
             s = s_centers[closest_centerpoint]
             start = s + obs[0].obstacle_shape.length/2
             end = s - obs[0].obstacle_shape.length/2
-            if start == end: pts = [np.linalg.norm(s_centers - start, axis=1).argmin()]
-            else: pts = [np.linalg.norm(s_centers - start, axis=1).argmin(),
-                   np.linalg.norm(s_centers - end, axis=1).argmin()]
+            if start == end: pts = [np.linalg.norm(s_centers - start).argmin()]
+            else: pts = [np.linalg.norm(s_centers - start).argmin(),
+                   np.linalg.norm(s_centers - end).argmin()]
         preceding_v = obs_state.velocity
         if len(pts) == 1:
             pt = pts[0]
@@ -223,12 +222,11 @@ class SafetyVerifier:
                 C.append(self.get_end_collision_free_area(lane, center, [0,pts[0]],preceding_v))
             else:
                 C.append((center[0 : pts[0]+1],lane, 0.0, preceding_v, 0.0))
-        print(C)
         return C
 
     def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle]) -> List[Obstacle]:
         obs_with_center : List[Tuple[Obstacle, float]] = []
-        ct, _, _, _ = self.precomputed_lane_polygons[l_id]
+        ct= self.precomputed_lane_polygons[l_id][0]
         for ob in obs:
             pos = (ob.state_at_time(self.time_step).position[0], ob.state_at_time(self.time_step).position[1])
             try:
