@@ -410,6 +410,7 @@ class SafetyVerifier:
                                     lb.append(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl))
                                     rb.append(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] - dr))
                                 except CartesianProjectionDomainError:
+                                    print("Cartesian projection domain error")
                                     pass
                                 i+=1
                             valid_road_polygons = [Polygon(lb + rb[::-1]).buffer(0)]
@@ -421,7 +422,7 @@ class SafetyVerifier:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
                             lane_polygon = unary_union(valid_road_polygons)
                             return lane_polygon.contains(rect)
-                        print("Tested acceleration with suitable v  : " , a)
+                        #print("Tested acceleration with suitable v  : " , a)
                         if in_safe_space(lp, rp):   return True
         return False
 
