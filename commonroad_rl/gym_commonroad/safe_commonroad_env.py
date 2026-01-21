@@ -153,7 +153,6 @@ class SafetyVerifier:
                 s_v_d.append((successor, min_v, total_dist))
             else:
                 s_v_d.append((successor, v_i, d_i))
-            print("clossest car : ", s_v_d[-1])
         min_ttc = math.inf
         closest_car = s_v_d[0][0]
         for lane_id, v_i, d_i in s_v_d:
