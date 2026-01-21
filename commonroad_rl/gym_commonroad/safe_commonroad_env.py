@@ -755,10 +755,11 @@ class SafetyLayer(CommonroadEnv):
         """
             Compute the steering velocity of the ego vehicle for lane keeping.
         """
-        L = self.prop_ego["ego_length"]
+        L = 2.9
         p = self.observation_collector._ego_state.position
         yaw = self.observation_collector._ego_state.orientation
         v = max(self.observation["v_ego"], 0.1)
+        k = self.safety_verifier.kappa(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
         steering_angle = math.atan(L * self.observation["global_turn_rate"] / v)
         cx = center_points[:, 0]
         cy = center_points[:, 1]
@@ -766,7 +767,7 @@ class SafetyLayer(CommonroadEnv):
         desired_angle,_,_ = self.stanley_controller.stanley_control(p[0],p[1],yaw,v,steering_angle,cx,cy,path_yaw)
         sv = (desired_angle - steering_angle)
         print("steering verlocity : ", sv)
-        return (float(np.clip(sv, -0.4, 0.4))/0.4) 
+        return (float(np.clip(sv, -0.4, 0.4))/0.4)
 
     def find_safe_acceleration(self, sv):
         """
