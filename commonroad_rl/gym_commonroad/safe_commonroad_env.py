@@ -115,7 +115,7 @@ class SafetyVerifier:
         pts = []
         for k in (c_pts, l_pts, r_pts):
             if k is not None:   pts.extend(k)
-        if not pts: return None
+        if not pts: return np.ndarray([])
         start = min(pts)
         end = max(pts)
         if start == end:    return np.ndarray([start])
@@ -190,7 +190,7 @@ class SafetyVerifier:
         #print(obs)
         obs_state = obs[i].state_at_time(self.time_step)
         pts : np.ndarray = self.obs_start_end_index(obs[i], lane.lanelet_id)
-        if pts is None:
+        if pts.size == 0:
             s_centers = self.precomputed_lane_polygons[lane.lanelet_id][1]
             p = np.asarray(obs_state.position).reshape(1, 2)
             closest_centerpoint = np.linalg.norm(self.dense_lanes[lane.lanelet_id][1] - p, axis=1).argmin()
@@ -201,7 +201,7 @@ class SafetyVerifier:
             else: pts = np.array([np.linalg.norm(s_centers - start).argmin(),
                    np.linalg.norm(s_centers - end).argmin()])
         preceding_v = obs_state.velocity
-        if len(pts) == 1:
+        if pts.size == 1:
             pt = pts[0]
             #print("first obs points 1")
         else:
@@ -214,10 +214,10 @@ class SafetyVerifier:
             pts = self.obs_start_end_index(obs[i + 1], lane.lanelet_id)
             cps = center[pt : pts[0] + 1]
             C.append((cps, lane, preceding_v, obs_state.velocity, 0.0))  # add middle collision free areas
-            if len(pts) == 2:
+            if pts.size == 2:
                 pt = pts[1]
             preceding_v = obs_state.velocity
-        if len(pts) == 2 and ((lane.lanelet_id == self.ego_lanelet.lanelet_id) or
+        if pts.size == 2 and ((lane.lanelet_id == self.ego_lanelet.lanelet_id) or
                               (self.l_id is not None and self.l_id == lane.lanelet_id) or
                               (self.r_id is not None and self.r_id == lane.lanelet_id)):
             # add last collision free area only for the ego and adjacent lanes
