@@ -767,7 +767,7 @@ class SafetyLayer(CommonroadEnv):
         print("steering_angle:",steering_angle)
         sv = (np.clip(desired_angle, -3, 3) - steering_angle)
         print(sv)
-        def normalize_steering_velocity(self, sv_phys):
+        def normalize_steering_velocity(sv_phys):
             max_sv_phys = 0.4
             sv_clipped = np.clip(sv_phys, -max_sv_phys, max_sv_phys)/math.pi
             sv_normalized = (sv_clipped / max_sv_phys) * 1000
