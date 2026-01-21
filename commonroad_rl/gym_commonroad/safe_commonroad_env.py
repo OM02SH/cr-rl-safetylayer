@@ -255,6 +255,8 @@ class SafetyVerifier:
                - d -> The Area to leave on edges for safe bounds in the lane
         """
         print(xi , "   ",yi, "   ",v_i, "   ",xj, "   ",yj, "   ",v_j)
+        if traveled_distance(cp,cp[-1]) < self.prop_ego["ego_length"]:
+            return []
         ct, s_centers, _, _ = self.precomputed_lane_polygons[l_id]
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
@@ -459,6 +461,7 @@ class SafetyLayer(CommonroadEnv):
                     observation_vector[index: index + size] = observation_dict[k].flat
                 except ValueError:
                     print(size , "   ", index, "   " , k)
+                    exit(1)
                 index += size
             return observation_vector
         base = pack_orig()
