@@ -759,18 +759,13 @@ class SafetyLayer(CommonroadEnv):
         yaw = self.observation_collector._ego_state.orientation
         v = max(self.observation["v_ego"], 0.1)
         steering_angle = math.atan(L * self.observation["global_turn_rate"] / v)
-        #print(type(center_points))
-        #print(np.shape(center_points))
-        if type(center_points) is not np.ndarray:
-            print("center points is not Iterable")
-            print(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id])
-
         cx = center_points[:, 0]
         cy = center_points[:, 1]
         path_yaw = np.unwrap(np.arctan2(np.gradient(cy), np.gradient(cx)))
         desired_angle,_,_ = self.stanley_controller.stanley_control(p[0],p[1],yaw,v,steering_angle,cx,cy,path_yaw)
         print("desired_angle:",desired_angle)
         print("steering_angle:",steering_angle)
+
         sv = (np.clip(desired_angle, -0.5, 0.5) - steering_angle) *10
         return (float(np.clip(sv, -0.4, 0.4)) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
 
