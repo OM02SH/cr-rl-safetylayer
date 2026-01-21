@@ -629,15 +629,20 @@ class SafetyLayer(CommonroadEnv):
             print("safe action")
             reward_for_safe_action = 1
         else:
-            a,b =  self.find_safe_acceleration(action[1])
+            a,b =  self.find_safe_acceleration(action[0])
             if a<=b:
-                action[0] = min(0,b) if self.observation["v_ego"] > 0 else max(0,a)
+                action[1] = min(0,b) if self.observation["v_ego"] > 0 else max(0,a)
                 reward_for_safe_action = 0.5
                 print("half safe action")
             else:
                 print("unsafe action : ", action)
-                print(self.observation["safe_actions"][1])
-                action = self.observation["safe_actions"][1]
+                action[0] = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
+                a,b =  self.find_safe_acceleration(action[0])
+                if a <= b:
+                    action[1] = min(0,a) if self.observation["v_ego"] > 0 else max(0,b)
+                else:
+                    action[1] = -1 if self.observation["v_ego"] > 0 else 1
+
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
