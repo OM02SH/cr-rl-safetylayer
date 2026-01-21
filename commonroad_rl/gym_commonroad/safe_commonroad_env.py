@@ -424,8 +424,8 @@ class SafetyVerifier:
                             if lane_polygon.contains(rect):
                                 return True
                             else:
-                                print(lane_polygon.convex_hull)
-                                print(rect.convex_hull)
+                                print(shapely.get_coordinates(lane_polygon))
+                                print(shapely.get_coordinates(rect.convex_hull))
                                 return False
                         if in_safe_space(lp, rp):   return True
         return False
