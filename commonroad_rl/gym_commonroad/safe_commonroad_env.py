@@ -456,7 +456,7 @@ class SafetyLayer(CommonroadEnv):
             observation_vector = np.zeros(self.observation_collector.observation_space.shape)
             index = 0
             for k in observation_dict.keys():
-                if k in ["safe_actions", "final_priority", "distance_to_lane_end"] : pass
+                if k in ["safe_actions", "final_priority", "distance_to_lane_end"] : continue
                 size = np.prod(self.observation_dict[k].shape)
                 try:
                     observation_vector[index: index + size] = observation_dict[k].flat
