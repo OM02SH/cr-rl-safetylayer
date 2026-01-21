@@ -458,7 +458,12 @@ class SafetyLayer(CommonroadEnv):
             for k in observation_dict.keys():
                 if k in ["safe_actions", "final_priority", "distance_to_lane_end"] : pass
                 size = np.prod(self.observation_dict[k].shape)
-                observation_vector[index: index + size] = observation_dict[k].flat
+                try:
+                    observation_vector[index: index + size] = observation_dict[k].flat
+                except ValueError as s:
+                    print(size , "   ", index, "   " , k)
+                    print(s)
+                    exit(1)
                 index += size
             return observation_vector
         base = pack_orig()
