@@ -774,8 +774,8 @@ class SafetyLayer(CommonroadEnv):
 
         # use nearest point
         kappa_des = kappa_des[len(kappa_des) // 2]
-
-        kappa_dot = (kappa_des - kappa) / self.dt
+        print(kappa_des - kappa)
+        kappa_dot = (kappa_des - kappa) / 0.1
 
         return float(np.clip(kappa_dot, -0.4, 0.4) / 0.4)
 
