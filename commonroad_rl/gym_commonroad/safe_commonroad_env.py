@@ -765,16 +765,16 @@ class SafetyLayer(CommonroadEnv):
         desired_angle,_,_ = self.stanley_controller.stanley_control(p[0],p[1],yaw,v,steering_angle,cx,cy,path_yaw)
         print("desired_angle:",desired_angle)
         print("steering_angle:",steering_angle)
-        sv = (np.clip(desired_angle, -3, 3) - steering_angle) *10
+        sv = (np.clip(desired_angle, -3, 3) - steering_angle)
         print(sv)
-        from commonroad_rl.gym_commonroad.action.action import ContinuousAction
-        a : ContinuousAction = None
-        print(self.ego_action.rescale_action([1, 1]))
-        print(self.ego_action.rescale_action([1, -1]))
-        print(self.ego_action.rescale_action([-1, 1]))
-        print(self.ego_action.rescale_action([-1, -1]))
-        print(self.ego_action.rescale_action([0, 0]))
-        return (float(np.clip(sv, -1.066, 1.066)) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
+        def normalize_steering_velocity(self, sv_phys):
+            max_sv_phys = 0.4
+            sv_clipped = np.clip(sv_phys, -max_sv_phys, max_sv_phys)
+            sv_normalized = (sv_clipped / max_sv_phys) * 1000
+            return int(sv_normalized)
+        res = (normalize_steering_velocity(sv) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
+        print(res)
+        return res
 
     def find_safe_acceleration(self, sv):
         """
