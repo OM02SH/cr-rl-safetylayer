@@ -420,10 +420,11 @@ class SafetyVerifier:
                                 for p_id in lane.predecessor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
                             lane_polygon = unary_union(valid_road_polygons)
-                            print(lane_polygon.area)
                             return lane_polygon.contains(rect)
                         #print("Tested acceleration with suitable v  : " , a)
-                        if in_safe_space(lp, rp):   return True
+                        if in_safe_space(lp, rp):
+                            print(sa, "   " , a)
+                            return True
         return False
 
 
@@ -637,6 +638,7 @@ class SafetyLayer(CommonroadEnv):
                 print("half safe action")
             else:
                 print("unsafe action : ", action)
+                print(self.observation_collector._ego_state)
                 print(self.safety_verifier.safe_set)
                 sv = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
                 a,b =  self.find_safe_acceleration(action[0])
