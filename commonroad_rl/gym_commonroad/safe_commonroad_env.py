@@ -636,12 +636,12 @@ class SafetyLayer(CommonroadEnv):
                 print("half safe action")
             else:
                 print("unsafe action : ", action)
-                action[0] = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
+                sv = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
                 a,b =  self.find_safe_acceleration(action[0])
                 if a <= b:
-                    action[1] = a if self.observation["a_ego"] > 0 else b
-                else:
-                    action[1] = -1 if self.observation["a_ego"] > 0 else 1
+                    action[0] = sv
+                    if in_conflict: action[1] = b
+                    else:   action[1] = b if self.observation["a_ego"] > 0 else a
                 print("new action : ", action)
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
@@ -767,7 +767,7 @@ class SafetyLayer(CommonroadEnv):
         cy = center_points[:, 1]
         path_yaw = np.unwrap(np.arctan2(np.gradient(cy), np.gradient(cx)))
         desired_angle,_,_ = self.stanley_controller.stanley_control(p[0],p[1],yaw,v,steering_angle,cx,cy,path_yaw)
-        sv = (np.clip(desired_angle, -0.5, 0.5) - steering_angle)
+        sv = (np.clip(desired_angle, -0.5, 0.5) - steering_angle)/0.1
         return (float(np.clip(sv, -0.4, 0.4)) - self.ego_action._rescale_bias[0]) /self.ego_action._rescale_factor[0]
 
     def find_safe_acceleration(self, sv):
