@@ -421,7 +421,7 @@ class SafetyVerifier:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
                             lane_polygon = unary_union(valid_road_polygons)
                             return lane_polygon.contains(rect)
-                        #print("Tested acceleration with suitable v  : " , a)
+                        print("Tested acceleration with suitable v  : " , a)
                         if in_safe_space(lp, rp):   return True
         return False
 
