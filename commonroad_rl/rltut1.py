@@ -49,7 +49,7 @@ gym.envs.registration.register(
     id="commonroad-v1-safe",
     entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
 )
-
+print("regestered gym environment")
 import gymnasium as gym
 # from stable_baselines.bench import Monitor
 from stable_baselines3.common.monitor import Monitor
@@ -64,7 +64,7 @@ training_env = gym.make("commonroad-v1-safe",
                         meta_scenario_path=meta_scenario_path,
                         train_reset_config_path= training_data_path,
                         **env_configs)
-
+print("training environment")
 # Wrap the environment with a monitor to keep an record of the learning process
 info_keywords=tuple(["is_collision", \
                      "is_time_out", \
@@ -77,7 +77,7 @@ training_env = Monitor(training_env, log_path + "0", info_keywords=info_keywords
 def make_training_env():
     return training_env
 training_env = DummyVecEnv([make_training_env])
-
+print("training environment")
 # Normalize observations and rewards
 training_env = VecNormalize(training_env, norm_obs=True, norm_reward=True)
 
@@ -141,55 +141,55 @@ eval_callback = EvalCallback(testing_env,
                              callback_on_new_best=save_vec_normalize_callback,
                              verbose=1)
 # print("stop_training status:", eval_callback.)
-
-import numpy as np
-import commonroad_clcs.pycrccosy as pycrccosy
-import matplotlib.pyplot as plt
-
-from commonroad_clcs.config import (
-    CLCSParams,
-    ProcessingOption,
-    ResamplingOption
-)
-from commonroad_clcs.ref_path_processing.factory import ProcessorFactory
+print("all inits done")
+#import numpy as np
+#import commonroad_clcs.pycrccosy as pycrccosy
+#import matplotlib.pyplot as plt
+#
+#from commonroad_clcs.config import (
+#    CLCSParams,
+#    ProcessingOption,
+#    ResamplingOption
+#)
+#from commonroad_clcs.ref_path_processing.factory import ProcessorFactory
 
 
 # initialize CLCS params
-params = CLCSParams()
+#params = CLCSParams()
 
 # curve subdivision settings
-params.processing_option = ProcessingOption.CURVE_SUBDIVISION
-params.subdivision.degree = 2
-params.subdivision.num_refinements = 3
-params.subdivision.coarse_resampling_step = 2.0
-params.subdivision.max_curvature = 0.13
+#params.processing_option = ProcessingOption.CURVE_SUBDIVISION
+#params.subdivision.degree = 2
+#params.subdivision.num_refinements = 3
+#params.subdivision.coarse_resampling_step = 2.0
+#params.subdivision.max_curvature = 0.13
+#
+#
+#resampled_polyline = np.load("resampled_polyline.npy")
+#
+## process reference path
+#ref_path_processor = ProcessorFactory.create_processor(params)
+#resampled_polyline = ref_path_processor(resampled_polyline)
 
-
-resampled_polyline = np.load("resampled_polyline.npy")
-
-# process reference path
-ref_path_processor = ProcessorFactory.create_processor(params)
-resampled_polyline = ref_path_processor(resampled_polyline)
-
-points_ = resampled_polyline
-x = [point[0] for point in points_]
-y = [point[1] for point in points_]
-plt.scatter(x, y)
-plt.title("resampled_polyline")
-plt.xlabel("X axis")
-plt.ylabel("Y axis")
-ax = plt.gca()
-ax.set_ylim([-100.0, 50.0])
+#points_ = resampled_polyline
+#x = [point[0] for point in points_]
+#y = [point[1] for point in points_]
+#plt.scatter(x, y)
+#plt.title("resampled_polyline")
+#plt.xlabel("X axis")
+#plt.ylabel("Y axis")
+#ax = plt.gca()
+#ax.set_ylim([-100.0, 50.0])
 # plt.axis("equal")
 
-ccosy = pycrccosy.CurvilinearCoordinateSystem(resampled_polyline, default_projection_domain_limit=40.0,  method=2)
+#ccosy = pycrccosy.CurvilinearCoordinateSystem(resampled_polyline, default_projection_domain_limit=40.0,  method=2)
 
 #proj_domain_border = np.asarray(ccosy.projection_domain())
 #plt.plot(proj_domain_border[:, 0], proj_domain_border[:, 1], zorder=100, marker=".", color="red")
 #plt.show()
 
-print("ccosy: ", ccosy.curvilinear_projection_domain()[0][1])
-print("ccosy: ", ccosy.projection_domain()[0][1])
+#print("ccosy: ", ccosy.curvilinear_projection_domain()[0][1])
+#print("ccosy: ", ccosy.projection_domain()[0][1])
 
 # from stable_baselines import PPO2
 from stable_baselines3 import PPO
