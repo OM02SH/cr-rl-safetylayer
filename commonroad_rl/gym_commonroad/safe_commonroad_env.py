@@ -24,9 +24,6 @@ from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
 
-from commonroad_rl.test import observation
-
-
 def traveled_distance(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
