@@ -183,7 +183,7 @@ class SafetyVerifier:
             return [self.get_end_collision_free_area(lane, center, [0,0], 0)]
         i = 0
         #print("obs before sorting")
-        print(obs)
+        #print(obs)
         obs = self.sort_obstacles_in_lane(lane.lanelet_id, obs)
         #print("obs after sorting")
         #print(obs)
@@ -626,16 +626,17 @@ class SafetyLayer(CommonroadEnv):
         in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         in_intersection = True if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys() else False
         if self.safety_verifier.safe_action_check(action[1],action[0], self.ego_action):
-            #print("safe action")
+            print("safe action")
             reward_for_safe_action = 1
         else:
             a,b =  self.find_safe_acceleration(action[1])
             if a<=b:
                 action[0] = min(0,b) if self.observation["v_ego"] > 0 else max(0,a)
                 reward_for_safe_action = 0.5
-                #print("half safe action")
+                print("half safe action")
             else:
-                print("unsafe action")
+                print("unsafe action : ", action)
+                print(self.observation["safe_actions"][1])
                 action = self.observation["safe_actions"][1]
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
