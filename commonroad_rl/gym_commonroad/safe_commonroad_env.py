@@ -450,7 +450,7 @@ class SafetyLayer(CommonroadEnv):
         self.pre_intersection_lanes = None
         self.precomputed_lane_polygons = {}
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-        self.safety_verifier = None
+        self.safety_verifier : SafetyVerifier = None
         self.in_or_entering_intersection = False
         self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float32),
                                         np.full(35, -1.0, dtype=np.float32)])
@@ -636,6 +636,7 @@ class SafetyLayer(CommonroadEnv):
                 print("half safe action")
             else:
                 print("unsafe action : ", action)
+                print(self.safety_verifier.safe_set)
                 sv = self.compute_steering_velocity(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
                 a,b =  self.find_safe_acceleration(action[0])
                 if a <= b:
