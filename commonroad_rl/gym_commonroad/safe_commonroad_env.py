@@ -636,8 +636,6 @@ class SafetyLayer(CommonroadEnv):
                 print("half safe action")
             else:
                 print("unsafe action : ", action)
-                print(self.observation_collector._ego_state)
-                print(self.safety_verifier.safe_set)
                 kdd = self.compute_kappa_dot_dot(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
                 a,b = self.find_safe_jerk_dot(action[0])
                 if a <= b:
@@ -688,6 +686,7 @@ class SafetyLayer(CommonroadEnv):
         self.planning_problem.draw(rnd)
         rnd.render()
         plt.show(block=False)"""
+        print(actions)
         print("")
         return observation_vector, reward, terminated, truncated, info
 
