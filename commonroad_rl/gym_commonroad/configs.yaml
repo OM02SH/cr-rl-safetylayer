@@ -61,7 +61,7 @@ env_configs:
     # Navigator Route Observations:
     observe_route_reference_path: True
     distances_route_reference_path: [-1000, 0, 5, 15, 100]
-    observe_route_multilanelet_waypoints: False
+    observe_route_multilanelet_waypoints: True
     distances_and_ids_multilanelet_waypoints: [[-1000, 0, 1000], [0, 1]]
     observe_distance_togoal_via_referencepath: True
           
