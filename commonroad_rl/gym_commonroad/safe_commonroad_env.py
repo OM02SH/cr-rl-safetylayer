@@ -637,13 +637,9 @@ class SafetyLayer(CommonroadEnv):
                 print("half safe action")
             else:
                 print("unsafe action")
-                if in_conflict:
-                    action[0] = self.compute_steering_velocity(
+                action[0] = self.compute_steering_velocity(
                         self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
-                    action[1] = 1
-                else:
-                    action[0] = 0
-                    action[1] = -1
+                action[1] = 1 if in_conflict else -1
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
