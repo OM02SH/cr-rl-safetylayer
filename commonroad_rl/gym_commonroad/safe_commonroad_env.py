@@ -398,12 +398,11 @@ class SafetyVerifier:
                 k, lane = s
                 if lane.lanelet_id == l.lanelet_id:
                     for start, end, v, dl, dr in k:
-                        if start == end : continue
-                        if not v - 1 <= nv <= v + 1:    continue
+                        if start == end or not (v - 1 <= nv <= v + 1) : continue
                         def in_safe_space(left_points : np.ndarray, right_points: np.ndarray):
                             left_bound = left_points[start: end + 1]
                             right_bound = right_points[start: end + 1]
-                            lb,rb = [], []
+                            lb, rb = [], []
                             i = 0
                             while i < len(left_bound):
                                 try :
@@ -421,6 +420,7 @@ class SafetyVerifier:
                                 for p_id in lane.predecessor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
                             lane_polygon = unary_union(valid_road_polygons)
+                            print(lane_polygon.area)
                             return lane_polygon.contains(rect)
                         #print("Tested acceleration with suitable v  : " , a)
                         if in_safe_space(lp, rp):   return True
