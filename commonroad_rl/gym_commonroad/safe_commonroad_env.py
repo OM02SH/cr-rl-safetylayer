@@ -24,6 +24,9 @@ from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
 
+from commonroad_rl.test import observation
+
+
 def traveled_distance(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
@@ -632,14 +635,14 @@ class SafetyLayer(CommonroadEnv):
         else:
             a,b =  self.find_safe_acceleration(action[1])
             if a<=b:
-                action[0] = max(0,a)
+                action[0] = min(0,b) if self.observation["v_ego"] > 0 else max(0,a)
                 reward_for_safe_action = 0.5
                 print("half safe action")
             else:
                 print("unsafe action")
                 action[0] = self.compute_steering_velocity(
                         self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
-                action[1] = 1 if in_conflict else -1
+                action[1] = 1 if in_conflict else -1 if self.observation["v_ego"] > 0 else 1
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
