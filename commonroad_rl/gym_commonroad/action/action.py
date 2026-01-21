@@ -258,6 +258,8 @@ class ContinuousAction(Action):
     def reset(self, initial_state: State, dt: float) -> None:
         self.vehicle.reset(initial_state, dt)
         self._set_rescale_factors()
+        print(self._rescale_bias)
+        print(self._rescale_factor)
 
     def step(self, action: Union[np.ndarray, int], local_ccosy: CurvilinearCoordinateSystem = None) -> None:
         """
