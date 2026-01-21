@@ -474,7 +474,7 @@ class SafetyLayer(CommonroadEnv):
             return observation_vector
         base = pack_orig()
         sa = self.observation["safe_actions"]
-        vec = np.zeros(sa.size + 2 + base.size, dtype=np.float32)
+        vec = np.zeros(sa.size + 2 + base.size, dtype=np.float64)
         idx = 0
         vec[idx:idx + base.size] = base
         idx += base.size
@@ -642,6 +642,8 @@ class SafetyLayer(CommonroadEnv):
                     action[0] = sv
                     if in_conflict: action[1] = b
                     else:   action[1] = b if self.observation["a_ego"] > 0 else a
+                else:
+                    print("sttering : ", sv, f"a: {a}, b: {b}")
                 print("new action : ", action)
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
