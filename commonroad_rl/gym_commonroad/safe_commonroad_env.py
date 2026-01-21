@@ -35,6 +35,7 @@ def traveled_distance(curve: np.ndarray, target):
 class SafetyVerifier:
 
     def __init__(self, scenario: Scenario, prop_ego, precomputed_lane_polygons, dense_lanes):
+        self.r_id = None
         self.scenario = scenario
         self.prop_ego = prop_ego
         self.in_or_entering_intersection = False
@@ -650,6 +651,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
+        print(observation)
         print(actions)
         if actions.size > 33:   actions = actions[:33]
         elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
