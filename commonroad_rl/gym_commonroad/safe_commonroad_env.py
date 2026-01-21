@@ -403,8 +403,8 @@ class SafetyVerifier:
                             i = 0
                             while i < len(left_bound):
                                 try :
-                                    lb.append(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl))
-                                    rb.append(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] - dr))
+                                    lb.append(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl + 0.1))
+                                    rb.append(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] - dr - 0.1))
                                 except CartesianProjectionDomainError:
                                     print("Cartesian projection domain error")
                                     pass
@@ -417,12 +417,7 @@ class SafetyVerifier:
                                 for p_id in lane.predecessor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
                             lane_polygon = shapely.union_all(valid_road_polygons)
-                            if lane_polygon.contains(rect):
-                                return True
-                            else:
-                                print(shapely.get_coordinates(lane_polygon))
-                                print(shapely.get_coordinates(rect.convex_hull))
-                                return False
+                            return lane_polygon.contains(rect)
                         if in_safe_space(lp, rp):   return True
         return False
 
