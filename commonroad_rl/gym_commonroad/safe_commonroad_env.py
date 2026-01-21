@@ -296,7 +296,7 @@ class SafetyVerifier:
                 #shrink_per_side = max(0, 2.5 - d_lim)
                 #lane_half_width = self.lane_width / 2
                 #shrink_per_side = np.clip(shrink_per_side, 0, lane_half_width - 0.1)
-                safe_states.append((min(start,end), max(start,end), v, 0.1, 0.1))
+                safe_states.append((min(start,end), max(start,end), v, 0, 0))
         return safe_states
 
     def union_safe_set(self, ll: Lanelet, safe_set_list_left : List[Tuple[int,int,float,float,float]]
