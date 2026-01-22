@@ -768,9 +768,9 @@ class SafetyLayer(CommonroadEnv):
     def compute_kappa_dot_dot(self, l_id, nxt_id, state = None):
         center_points = self.dense_lanes[l_id][1]
         if state is None:
-            v = max(self.observation["v_ego"], 0.1)
-            kappa = self.observation["slip_angle"]
-            kappa_dot = self.observation["global_turn_rate"]
+            v = max(self.observation["v_ego"][0], 0.1)
+            kappa = self.observation["slip_angle"][0]
+            kappa_dot = self.observation["global_turn_rate"][0]
             pos = self.observation_collector._ego_state.position.reshape(1, 2)
             theta = self.observation_collector._ego_state.orientation
         else:
@@ -784,13 +784,12 @@ class SafetyLayer(CommonroadEnv):
         def wrap_to_pi(angle):
             return (angle + np.pi) % (2 * np.pi) - np.pi
         la = max(5.0, 2.0 * v)
-
         local_center = extract_segment(
             self.precomputed_lane_polygons[l_id][0],
             pos,    center_points,  s,  la,
             self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
             self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
-        e_theta = wrap_to_pi(theta - compute_orientation_from_polyline(local_center))
+        e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
         kappa_lane = self.safety_verifier.kappa(local_center)
         kdd = compute_kappa_dot_dot_helper(d,e_theta,v,kappa_lane,self.prop_ego["a_lat_max"],kappa,kappa_dot)
         print(kdd)
