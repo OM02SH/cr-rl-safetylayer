@@ -51,10 +51,13 @@ def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, loo
         return center_points[closest_centerpoint:]
     elif remain > lookahead:
         far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
-        return center_points[closest_centerpoint:far_pos]
+        return center_points[closest_centerpoint:far_pos + 1]
     lookahead_in_nxt = lookahead - remain
-    far_pos = np.linalg.norm(nxt_cps - np.array(nct.convert_to_cartesian_coords(s+lookahead_in_nxt, 0)),axis=1).argmin()
-    return np.vstack((center_points[closest_centerpoint:], nxt_cps[:far_pos]))
+    if lookahead_in_nxt<0.1 or lookahead_in_nxt>traveled_distance(nxt_cps,nxt_cps[-1]):
+        far_pos = len(center_points)
+    else:
+        far_pos = np.linalg.norm(nxt_cps - np.array(nct.convert_to_cartesian_coords(s+lookahead_in_nxt, 0)),axis=1).argmin()
+    return np.vstack((center_points[closest_centerpoint:], nxt_cps[:far_pos + 1]))
 
 class SafetyVerifier:
 
