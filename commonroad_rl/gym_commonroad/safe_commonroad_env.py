@@ -36,6 +36,7 @@ def traveled_distance(curve: np.ndarray, target):
     return d
 
 def compute_kappa_dot_dot_helper(ey, e_theta, v, kappa_lane, a_lat_max, kappa, kappa_dot):
+    print(ey, e_theta, v, kappa_lane, a_lat_max, kappa, kappa_dot)
     kappa_corr = -(1.5 * ey) / (v ** 2) - (1.0 * e_theta) / v
     kappa_ref = kappa_lane + kappa_corr
     kappa_max = a_lat_max / (v ** 2)
