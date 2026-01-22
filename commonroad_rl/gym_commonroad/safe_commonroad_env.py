@@ -774,7 +774,7 @@ class SafetyLayer(CommonroadEnv):
             pos = state.position.reshape(1, 2)
             theta = state.orientation
         ct = self.precomputed_lane_polygons[l_id][0]
-        s, d = ct.convert_to_curvilinear_coords(pos[0],pos[1])
+        s, d = ct.convert_to_curvilinear_coords(pos[0][0],pos[0][1])
         def wrap_to_pi(angle):
             return (angle + np.pi) % (2 * np.pi) - np.pi
         la = max(5.0, 2.0 * v)
