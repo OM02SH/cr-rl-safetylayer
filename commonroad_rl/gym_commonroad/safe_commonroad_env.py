@@ -6,7 +6,6 @@ from scipy.interpolate import interp1d
 
 from shapely.geometry import Polygon
 from shapely.affinity import rotate, translate
-from shapely.ops import unary_union
 import shapely
 from gymnasium import spaces
 
@@ -20,6 +19,7 @@ from commonroad_rl.gym_commonroad.constants import PATH_PARAMS
 from commonroad.scenario.obstacle import Obstacle
 from commonroad_clcs.clcs import CurvilinearCoordinateSystem
 from commonroad_clcs.config import CLCSParams
+from commonroad_clcs.util import compute_orientation_from_polyline
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
@@ -35,6 +35,26 @@ def traveled_distance(curve: np.ndarray, target):
         d += math.hypot(curve[k][0] - curve[k + 1][0], curve[k][1] - curve[k + 1][1])
     return d
 
+def compute_kappa_dot_dot_helper(ey, e_theta, v, kappa_lane, a_lat_max, kappa, kappa_dot):
+    kappa_corr = -(1.5 * ey) / (v ** 2) - (1.0 * e_theta) / v
+    kappa_ref = kappa_lane + kappa_corr
+    kappa_max = a_lat_max / (v ** 2)
+    kappa_ref = np.clip(kappa_ref, -kappa_max, kappa_max)
+    kappa_ddot = 4.0 * (kappa_ref - kappa) - 2.0 * kappa_dot
+    return float(np.clip(kappa_ddot / 20.0, -1.0, 1.0))
+
+def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, lookahead, nxt_cps,nct : CurvilinearCoordinateSystem):
+    closest_centerpoint = np.linalg.norm(center_points - pos, axis=1).argmin()
+    remain = traveled_distance(center_points[::-1], center_points[closest_centerpoint])
+    if lookahead - 1e-4 < remain < lookahead + 1e-4:
+        return center_points[closest_centerpoint:]
+    elif remain > lookahead:
+        far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
+        return center_points[closest_centerpoint:far_pos]
+    lookahead_in_nxt = lookahead - remain
+    far_pos = np.linalg.norm(nxt_cps - np.array(nct.convert_to_cartesian_coords(s+lookahead_in_nxt, 0)),axis=1).argmin()
+    return np.vstack((center_points[closest_centerpoint:], nxt_cps[:far_pos]))
+
 class SafetyVerifier:
 
     def __init__(self, scenario: Scenario, prop_ego, precomputed_lane_polygons, dense_lanes):
@@ -42,7 +62,6 @@ class SafetyVerifier:
         self.r_id = None
         self.scenario = scenario
         self.prop_ego = prop_ego
-        self.in_or_entering_intersection = False
         self.safe_set : List[Tuple[List[Tuple[int,int,float,float,float]],Lanelet]] = []
         self.precomputed_lane_polygons: Dict[int, Tuple[CurvilinearCoordinateSystem,
                     np.ndarray, np.ndarray, np.ndarray]] = precomputed_lane_polygons
@@ -55,11 +74,10 @@ class SafetyVerifier:
         lanes = [self.ego_lanelet]
         for l_id in self.ego_lanelet.successor:
             lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(l_id))
-        if not self.in_or_entering_intersection:
-            if self.ego_lanelet.adj_left_same_direction:
-                lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left))
-            if self.ego_lanelet.adj_right_same_direction:
-                lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right))
+        if self.ego_lanelet.adj_left_same_direction:
+            lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left))
+        if self.ego_lanelet.adj_right_same_direction:
+            lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right))
         return lanes
 
     @staticmethod
@@ -337,7 +355,6 @@ class SafetyVerifier:
         self.l_id = self.ego_lanelet.adj_left if self.ego_lanelet.adj_left_same_direction else None
         self.r_id = self.ego_lanelet.adj_right if self.ego_lanelet.adj_right_same_direction else None
         self.time_step += 1
-        self.in_or_entering_intersection = in_or_entering_intersection
         S : List[Tuple[List[Tuple[float,float,float,float,float]],Lanelet]] = []
         C = []
         #print("lanes to check")
@@ -356,7 +373,7 @@ class SafetyVerifier:
             k, lane = s
             if lane == self.ego_lanelet:
                 es.extend(k)
-        if not self.in_or_entering_intersection:
+        if not in_or_entering_intersection:
             if self.l_id:
                 #print("unioning")
                 ll : Lanelet = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
@@ -444,7 +461,7 @@ class SafetyLayer(CommonroadEnv):
         self.conflict_lanes : defaultdict[int, List[Tuple[Lanelet, bool]]] = defaultdict(list)
         self.stanley_controller = StanleyController(3,1,0.05,0.3, 3.14, 2.9)
         self.pre_intersection_lanes = None
-        self.precomputed_lane_polygons = {}
+        self.precomputed_lane_polygons : Dict[int, Tuple[CurvilinearCoordinateSystem, np.ndarray, np.ndarray, np.ndarray]] = {}
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
         self.safety_verifier = None
         self.in_or_entering_intersection = False
@@ -632,7 +649,9 @@ class SafetyLayer(CommonroadEnv):
                 print("half safe action")
             else:
                 print("unsafe action : ", action)
-                kdd = self.compute_kappa_dot_dot(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
+                route_ids = self.observation_collector.navigator.route.list_ids_lanelets
+                curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
+                kdd = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,route_ids[curr_index + 1] if len(route_ids) > curr_index + 1 else 0)
                 a,b = self.find_safe_jerk_dot(action[0])
                 if a <= b:
                     action[0] = kdd
@@ -737,31 +756,38 @@ class SafetyLayer(CommonroadEnv):
             return False
         if (self.observation["v_ego"]**2 / (2 * a_max) < self.observation["distance_to_lane_end"] or
                 self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys()):
-            #print("intersection check True")
-            #if self.observation["v_ego"]**2 / (2 * a_max) < self.observation["distance_to_lane_end"]:
-                #print("near lane end")
-            #else:
-                #print("in intersection")
             return True
-        #print("intersection check False")
         return False
 
-    def compute_kappa_dot_dot(self, center_points):
-        v = max(self.observation["v_ego"], 0.1)
-        kappa_ref = self.safety_verifier.kappa(center_points)
-        kappa_max = self.prop_ego["a_lat_max"] / (v ** 2)
-        kappa_ref = np.clip(kappa_ref, -kappa_max, kappa_max)
-        kappa = self.observation["slip_angle"]
-        kappa_dot = self.observation["global_turn_rate"]
-        """omega_n = 1.5 / dt
-        zeta = 0.7
-
-        kp = omega_n ** 2
-        kd = 2 * zeta * omega_n
-        kp = 4
-        kd = 2"""
-        kappa_ddot = 4.0 * (kappa_ref - kappa) - 2.0 * kappa_dot
-        return float(np.clip(kappa_ddot / 20, -1.0, 1.0))
+    def compute_kappa_dot_dot(self, l_id, nxt_id, state = None):
+        center_points = self.dense_lanes[l_id][1]
+        if state is None:
+            v = max(self.observation["v_ego"], 0.1)
+            kappa = self.observation["slip_angle"]
+            kappa_dot = self.observation["global_turn_rate"]
+            pos = self.observation_collector._ego_state.position.reshape(1, 2)
+            theta = self.observation_collector._ego_state.orientation
+        else:
+            v = max(state.velocity,0.1)
+            kappa = state.slip_angle
+            kappa_dot = state.yaw_rate
+            pos = state.position.reshape(1, 2)
+            theta = state.orientation
+        ct = self.precomputed_lane_polygons[l_id][0]
+        s, d = ct.convert_to_curvilinear_coords(pos[0],pos[1])
+        def wrap_to_pi(angle):
+            return (angle + np.pi) % (2 * np.pi) - np.pi
+        la = max(5.0, 2.0 * v)
+        local_center = extract_segment(
+            self.precomputed_lane_polygons[l_id][0],
+            pos,    center_points,  s,  la,
+            self.dense_lanes[nxt_id][1],
+            self.precomputed_lane_polygons[nxt_id][0])
+        e_theta = wrap_to_pi(theta - compute_orientation_from_polyline(local_center))
+        kappa_lane = self.safety_verifier.kappa(local_center)
+        kdd = compute_kappa_dot_dot_helper(d,e_theta,v,kappa_lane,self.prop_ego["a_lat_max"],kappa,kappa_dot)
+        print(kdd)
+        return kdd
 
     def find_safe_jerk_dot(self, kappa_ddot):
         """
@@ -805,23 +831,20 @@ class SafetyLayer(CommonroadEnv):
         At_safe_l = []
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
-            #print(route_ids)
-            #print("past lanes : ", self.past_ids)
             if self.past_ids[len(self.past_ids)-2] in route_ids:
                 last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
                 if last_index == len(route_ids) - 1:
-                    #print("returned empty list")
                     return np.array([])  # simulation is done no next route
                 if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]) :
-                    fcl_input = self.compute_kappa_dot_dot(self.dense_lanes[route_ids[last_index]][1]) # swerved into a neighbor
+                    fcl_input = self.compute_kappa_dot_dot(route_ids[last_index], route_ids[last_index + 1] if len(route_ids) > last_index + 1 else 0) # swerved into a neighbor
                 else: # got into a wrong successor
-                    fcl_input = self.compute_kappa_dot_dot(self.dense_lanes[route_ids[last_index + 1]][1])
+                    fcl_input = self.compute_kappa_dot_dot(route_ids[last_index + 1], route_ids[last_index + 2] if len(route_ids) > last_index + 2 else 0)
                 kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # return to the route
-            else: # lost
-                #print("Lost")
+            else:
                 return np.array([])
         else :
-            fcl_input = self.compute_kappa_dot_dot(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
+            idx = route_ids.index(self.observation_collector.ego_lanelet_id)
+            fcl_input = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,route_ids[idx + 1] if len(route_ids) > idx + 1 else 0)
             if self.observation_collector.ego_lanelet.adj_left_same_direction:
                 if self.observation_collector.ego_lanelet.adj_right_same_direction:
                     kappa_dot_dots = np.linspace(-0.8, 0.8, 11) # left, current and right
@@ -900,13 +923,11 @@ class SafetyLayer(CommonroadEnv):
             if self.past_ids[len(self.past_ids) - 2] in route_ids:
                 last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
                 if last_index == len(route_ids) - 1:
-                    #print("returned empty list")
                     return np.array([])  # simulation is done no next route
                 if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]):
-                    fcl_input = self.compute_kappa_dot_dot(
-                        self.dense_lanes[route_ids[last_index]][1])  # swerved into a neighbor
+                    fcl_input = self.compute_kappa_dot_dot(route_ids[last_index],route_ids[last_index + 1] if len(route_ids) > last_index + 1 else 0)  # swerved into a neighbor
                 else:  # got into a wrong successor
-                    fcl_input = self.compute_kappa_dot_dot(self.dense_lanes[route_ids[last_index + 1]][1])
+                    fcl_input = self.compute_kappa_dot_dot(route_ids[last_index + 1],route_ids[last_index + 2] if len(route_ids) > last_index + 2 else 0)
             else:  # lost
                 #print("Lost")
                 return np.array([])
@@ -922,12 +943,12 @@ class SafetyLayer(CommonroadEnv):
             else:
                 self.priority(nxt_lane, self.pre_intersection_lanes)
             if self.prop_ego["ego_length"] / 2 >= self.observation["distance_to_lane_end"]:
-                fcl_input = self.compute_kappa_dot_dot(self.dense_lanes[nxt_lane.lanelet_id][1])
+                fcl_input = self.compute_kappa_dot_dot(nxt_lane.lanelet_id,route_ids[curr_index + 2] if len(route_ids) > curr_index + 2 else 0)
                 self.final_priority = 1
             else:
                 if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys():
                     self.final_priority = 1
-                fcl_input = self.compute_kappa_dot_dot(self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id][1])
+                fcl_input = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,route_ids[curr_index + 1] if len(route_ids) > curr_index + 1 else 0)
         kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for kdd in kappa_dot_dots:
             safe_min, safe_max = self.find_safe_jerk_dot(kdd)
