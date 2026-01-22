@@ -621,7 +621,7 @@ class ConflictZone(ABC):
 
         return lane_changing_feasible, delta_s_near, delta_s_far
 
-    def get_ego_intersection_observation(self, position: np.array):
+    def get_ego_intersection_observation(self, ego_lane_id):
         """
         checks if the ego vehicle is near enough to the intersection areas
 
@@ -631,7 +631,7 @@ class ConflictZone(ABC):
             distance to the nearest boundary of conflict zone
             distance to the farest boundary of conflict zone
         """
-        ego_lane_id = self.scenario.lanelet_network.find_lanelet_by_position([position])[0][0]
+        #ego_lane_id = self.scenario.lanelet_network.find_lanelet_by_position([position])[0][0]
         for lane in self.lane_list:
             if ego_lane_id in lane[0]:
                 ref_lane_id = lane[1].lanelet_id

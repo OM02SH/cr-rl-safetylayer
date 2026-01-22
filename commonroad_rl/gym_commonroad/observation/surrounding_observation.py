@@ -220,7 +220,7 @@ class SurroundingObservation(Observation):
                 raise ValueError
 
         if self.observe_ego_distance_intersection:
-            s_near, s_far = conflict_zone.get_ego_intersection_observation(self._ego_state.position)
+            s_near, s_far = conflict_zone.get_ego_intersection_observation(ego_lanelet.lanelet_id)
             self.observation_dict["ego_distance_intersection"] = np.array([s_near, s_far])
 
         return self.observation_dict, ego_vehicle_lat_position, self.detected_obstacles
