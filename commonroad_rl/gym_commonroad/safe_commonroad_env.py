@@ -426,13 +426,13 @@ class SafetyVerifier:
                             i = 0
                             while i < len(left_bound):
                                 try :
-                                    lb.append(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl + 0.1))
-                                    rb.append(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] - dr - 0.1))
+                                    lb.append(ct.convert_to_cartesian_coords(left_bound[i][0], left_bound[i][1] - dl - 0.1))
+                                    rb.append(ct.convert_to_cartesian_coords(right_bound[i][0], right_bound[i][1] - dr + 0.1))
                                 except CartesianProjectionDomainError:
                                     print("Cartesian projection domain error")
                                     pass
                                 i+=1
-                            valid_road_polygons = [Polygon(lb + rb[::-1]).buffer(0)]
+                            valid_road_polygons = [Polygon(lb + rb[::-1]).buffer(0.1)]
                             if end == len(left_bound):
                                 for s_id in lane.successor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(s_id).polygon.shapely_object.buffer(0))
@@ -469,7 +469,7 @@ class SafetyLayer(CommonroadEnv):
         self.pre_intersection_lanes = None
         self.precomputed_lane_polygons : Dict[int, Tuple[CurvilinearCoordinateSystem, np.ndarray, np.ndarray, np.ndarray]] = {}
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-        self.safety_verifier = None
+        self.safety_verifier : SafetyVerifier = None
         self.in_or_entering_intersection = False
         self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float32),
                                         np.full(35, -1.0, dtype=np.float32)])
@@ -534,7 +534,7 @@ class SafetyLayer(CommonroadEnv):
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
         # for k in self.observation.keys():   print(k, " : ", self.observation[k])
         observation_vector = self.pack_observation(initial_observation)
-        """import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
         from commonroad.visualization.mp_renderer import MPRenderer
         plt.figure(figsize=(25, 10))
         rnd = MPRenderer()
@@ -542,7 +542,8 @@ class SafetyLayer(CommonroadEnv):
         self.observation_collector._scenario.draw(rnd)
         self.planning_problem.draw(rnd)
         rnd.render()
-        plt.show(block=False)"""
+        plt.show(block=False)
+        print(self.observation_collector._ego_state.position)
         #print("")
         return observation_vector, info
 
@@ -656,8 +657,15 @@ class SafetyLayer(CommonroadEnv):
             else:
                 print("unsafe action : ", action)
                 route_ids = self.observation_collector.navigator.route.list_ids_lanelets
-                curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
-                kdd = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,route_ids[curr_index + 1] if len(route_ids) > curr_index + 1 else 0)
+                if self.observation_collector.ego_lanelet.lanelet_id in route_ids:
+                    curr_index = route_ids.index(self.observation_collector.ego_lanelet.lanelet_id)
+                else:
+                    curr_index = 1
+                    for k in self.past_ids[::-1]:
+                        if k in route_ids:
+                            curr_index = route_ids.index(k)
+                            break
+                kdd = self.compute_kappa_dot_dot(route_ids[curr_index],route_ids[curr_index + 1] if len(route_ids) > curr_index + 1 else 0)
                 a,b = self.find_safe_jerk_dot(action[0])
                 if a <= b:
                     action[0] = kdd
@@ -695,7 +703,7 @@ class SafetyLayer(CommonroadEnv):
         #for k in self.observation.keys():   print(k, " : ", self.observation[k])
         observation_vector = self.pack_observation(observation)
         if terminated:
-            #print(info)
+            print(info)
             print(self.termination_reason)
         #print(self.observation_collector._ego_state.position)
         """import matplotlib.pyplot as plt
@@ -780,10 +788,15 @@ class SafetyLayer(CommonroadEnv):
             pos = state.position.reshape(1, 2)
             theta = state.orientation
         ct = self.precomputed_lane_polygons[l_id][0]
-        s, d = ct.convert_to_curvilinear_coords(pos[0][0],pos[0][1])
+        try:
+            s, d = ct.convert_to_curvilinear_coords(pos[0][0],pos[0][1])
+        except CartesianProjectionDomainError:
+            ccp = center_points[np.linalg.norm(center_points - pos, axis=1).argmin()]
+            s, _ =  ct.convert_to_curvilinear_coords(ccp[0],ccp[1])
+            d = math.dist(pos[0], ccp)
         def wrap_to_pi(angle):
             return (angle + np.pi) % (2 * np.pi) - np.pi
-        la = max(5.0, 2.0 * v)
+        la = max(5.0, v)
         local_center = extract_segment(
             self.precomputed_lane_polygons[l_id][0],
             pos,    center_points,  s,  la,
