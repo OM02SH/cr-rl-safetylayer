@@ -434,7 +434,7 @@ class SafetyLayer(CommonroadEnv):
         #print("init")
         self.observation = None
         self.past_ids = []
-        self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
+        self.prop_ego = {"ego_length" : 3, "ego_width" : 1.5 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.lane_width = 5
         self.last_relative_heading = 0
