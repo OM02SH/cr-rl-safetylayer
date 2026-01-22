@@ -621,7 +621,7 @@ class ConflictZone(ABC):
 
         return lane_changing_feasible, delta_s_near, delta_s_far
 
-    def get_ego_intersection_observation(self, ego_lane_id):
+    def get_ego_intersection_observation(self, ego_lane_id, position):
         """
         checks if the ego vehicle is near enough to the intersection areas
 
