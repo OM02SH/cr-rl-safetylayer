@@ -437,10 +437,10 @@ class SafetyVerifier:
         safe_max = low
         return safe_min, safe_max
 
-    def safe_action_check(self, jd, kdd, ego_action : Action, p = 0, l_id = 0, nxt_id = 0):
-        if p == 10:
+    def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
+        if q == 10:
             return True
-        p += 1
+        q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
         p = new_vehicle_state.position
