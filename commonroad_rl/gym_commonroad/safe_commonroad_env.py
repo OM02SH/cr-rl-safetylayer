@@ -73,11 +73,13 @@ def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, loo
     closest_centerpoint = np.linalg.norm(center_points - pos, axis=1).argmin()
     remain = traveled_distance(center_points[::-1], center_points[closest_centerpoint])
     if lookahead - 1e-4 < remain < lookahead + 1e-4:
+        if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
         return center_points[closest_centerpoint:]
     elif remain > lookahead:
         far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
         return center_points[closest_centerpoint:far_pos + 1]
     if nxt_cps is None:
+        if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
         return center_points[closest_centerpoint:]
     lookahead_in_nxt = lookahead - remain
     if lookahead_in_nxt <0.1 or lookahead_in_nxt>traveled_distance(nxt_cps,nxt_cps[-1]):
@@ -866,6 +868,17 @@ class SafetyLayer(CommonroadEnv):
                 return True
         return False
 
+    def wrong_lane_choice_fall_back(self,route_ids):
+        last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
+        if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]):
+            l_id, nxt_id = route_ids[last_index], route_ids[last_index + 1] if len(route_ids) > last_index + 1 else 0
+            fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)  # swerved into a neighbor
+        else:  # got into a wrong successor
+            l_id, nxt_id = route_ids[last_index + 1], route_ids[last_index + 2] if len(route_ids) > last_index + 2 else 0
+            fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
+        kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # return to the route
+        return l_id, nxt_id, kappa_dot_dots
+
     def lane_safety(self):
         """
             Returns an array of safe actions each as a tuple of (kdd,(jd_min,dj_max)).
@@ -875,18 +888,10 @@ class SafetyLayer(CommonroadEnv):
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
             if self.past_ids[len(self.past_ids)-2] in route_ids:
-                last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
-                if last_index == len(route_ids) - 1:
+                if route_ids.index(self.past_ids[len(self.past_ids) - 2]) == len(route_ids) - 1:
                     return np.array([])  # simulation is done no next route
-                if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]) :
-                    l_id, nxt_id = route_ids[last_index], route_ids[last_index + 1] if len(route_ids) > last_index + 1 else 0
-                    fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id) # swerved into a neighbor
-                else: # got into a wrong successor
-                    l_id, nxt_id = route_ids[last_index + 1], route_ids[last_index + 2] if len(route_ids) > last_index + 2 else 0
-                    fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
-                kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # return to the route
-            else:
-                return np.array([])
+                l_id, nxt_id, kappa_dot_dots = self.wrong_lane_choice_fall_back(route_ids)
+            else:   return np.array([]) # lost
         else :
             idx = route_ids.index(self.observation_collector.ego_lanelet_id)
             l_id, nxt_id = self.observation_collector.ego_lanelet.lanelet_id,route_ids[idx + 1] if len(route_ids) > idx + 1 else 0
@@ -965,18 +970,10 @@ class SafetyLayer(CommonroadEnv):
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
             if self.past_ids[len(self.past_ids) - 2] in route_ids:
-                last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
-                if last_index == len(route_ids) - 1:
+                if route_ids.index(self.past_ids[len(self.past_ids) - 2]) == len(route_ids) - 1:
                     return np.array([])  # simulation is done no next route
-                if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]):
-                    l_id, nxt_id = route_ids[last_index],route_ids[last_index + 1] if len(route_ids) > last_index + 1 else 0
-                    fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)  # swerved into a neighbor
-                else:  # got into a wrong successor
-                    l_id, nxt_id = route_ids[last_index + 1],route_ids[last_index + 2] if len(route_ids) > last_index + 2 else 0
-                    fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
-            else:  # lost
-                #print("Lost")
-                return np.array([])
+                l_id, nxt_id, kappa_dot_dots = self.wrong_lane_choice_fall_back(route_ids)
+            else:   return np.array([]) # lost
         else:
             l_id = self.observation_collector.ego_lanelet.lanelet_id
             curr_index = route_ids.index(l_id)
@@ -1008,4 +1005,3 @@ class SafetyLayer(CommonroadEnv):
     @property
     def observation_space(self):
         return spaces.Box(low=self.new_low, high=self.new_high, dtype=self.observation_collector.observation_space.dtype)
-
