@@ -529,6 +529,8 @@ class SafetyLayer(CommonroadEnv):
                                         np.full(35, -1.0, dtype=np.float32)])
         self.new_high = np.concatenate([self.observation_collector.observation_space.high.astype(np.float32),
                                         np.full(35, 1.0, dtype=np.float32)])
+        self.l_id = 0
+        self.nxt_id = 0
 
     def pack_observation(self, observation_dict):
         def pack_orig():
@@ -558,23 +560,7 @@ class SafetyLayer(CommonroadEnv):
         vec[idx] = float(self.observation["final_priority"])
         return vec
 
-    def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
-              planning_problem: PlanningProblem = None) -> np.ndarray:
-        self.past_ids = []
-        initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
-        print(self.observation_collector._scenario.scenario_id)
-        self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
-        self.time_step = 0
-        self.compute_lane_sides_and_conflict()
-        _, center_points, _ = self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id]
-        ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
-        closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
-        self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons, self.dense_lanes)
-        self.observation = initial_observation.copy()
-        self.observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
-        self.in_or_entering_intersection = self.intersection_check()
-        self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
-        self.pre_intersection_lanes = None
+    def apply_safety(self, observation,info,terminated):
         if self.in_or_entering_intersection:
             actions = self.intersection_safety()
         else:
@@ -587,7 +573,7 @@ class SafetyLayer(CommonroadEnv):
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = np.array([self.final_priority], dtype=object)
         # for k in self.observation.keys():   print(k, " : ", self.observation[k])
-        observation_vector = self.pack_observation(initial_observation)
+        observation_vector = self.pack_observation(observation)
         """import matplotlib.pyplot as plt
         from commonroad.visualization.mp_renderer import MPRenderer
         plt.figure(figsize=(25, 10))
@@ -599,6 +585,33 @@ class SafetyLayer(CommonroadEnv):
         plt.show(block=False)"""
         #print(self.observation_collector._ego_state.position)
         #print("")
+        print(actons)
+        if terminated:
+            print(info)
+            print(self.termination_reason)
+        return observation_vector
+
+    def get_distance_to_lane_end(self):
+        _, center_points, _ = self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id]
+        ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
+        closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
+        self.observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
+
+    def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
+              planning_problem: PlanningProblem = None) -> np.ndarray:
+        self.past_ids = []
+        initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
+        print(self.observation_collector._scenario.scenario_id)
+        self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
+        self.time_step = 0
+        self.compute_lane_sides_and_conflict()
+        self.observation = initial_observation.copy()
+        self.get_distance_to_lane_end()
+        self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons, self.dense_lanes)
+        self.in_or_entering_intersection = self.intersection_check()
+        self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
+        self.pre_intersection_lanes = None
+        observation_vector = self.apply_safety(initial_observation,info,False)
         return observation_vector, info
 
     def compute_lane_sides_and_conflict(self):
@@ -699,11 +712,11 @@ class SafetyLayer(CommonroadEnv):
         reward_for_safe_action = 0
         in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         in_intersection = True if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys() else False
-        if self.safety_verifier.safe_action_check(action[1],action[0], self.ego_action):
+        if self.safety_verifier.safe_action_check(action[1],action[0], self.ego_action,0,self.l_id,self.nxt_id):
             print("safe action")
             reward_for_safe_action = 1
         else:
-            a,b =  self.safety_verifier.find_safe_jerk_dot(self.ego_action,action[0],0,0,0)
+            a,b =  self.safety_verifier.find_safe_jerk_dot(self.ego_action,action[0],self.l_id,self.nxt_id,0)
             if a<=b:
                 action[0] = min(0,b) if self.observation["v_ego"] > 0 else max(0,a)
                 reward_for_safe_action = 0.5
@@ -729,43 +742,12 @@ class SafetyLayer(CommonroadEnv):
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
         else:   reward -= 800
-        _, center_points, _ = self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id]
-        ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1, 2)
-        closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
         self.observation = observation
-        self.observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
+        self.get_distance_to_lane_end()
         self.time_step += 1
         self.in_or_entering_intersection = self.intersection_check()
         self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection)
-        if self.in_or_entering_intersection:
-            actions =self.intersection_safety()
-        else:
-            self.pre_intersection_lanes = None
-            self.final_priority = -1
-            actions = self.lane_safety()
-        #for k in observation.keys():    print(k , " : ", observation[k])
-        #print("actions : ", actions)
-        if actions.size > 33:   actions = actions[:33]
-        elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
-        self.observation["safe_actions"] = actions
-        self.observation["final_priority"] = np.array([self.final_priority], dtype= object)
-        #for k in self.observation.keys():   print(k, " : ", self.observation[k])
-        observation_vector = self.pack_observation(observation)
-        if terminated:
-            print(info)
-            print(self.termination_reason)
-        #print(self.observation_collector._ego_state.position)
-        """import matplotlib.pyplot as plt
-        from commonroad.visualization.mp_renderer import MPRenderer
-        plt.figure(figsize=(25, 10))
-        rnd = MPRenderer()
-        rnd.draw_params.time_begin = self.time_step
-        self.observation_collector._scenario.draw(rnd)
-        self.planning_problem.draw(rnd)
-        rnd.render()
-        plt.show(block=False)"""
-        print(actions)
-        print("")
+        observation_vector = self.apply_safety(observation, info, terminated)
         return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
@@ -834,25 +816,6 @@ class SafetyLayer(CommonroadEnv):
                                             self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
                                             self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
-    def find_safe_jerk_dot(self, kappa_ddot, l_id, nxt_id):
-        """
-            Binary search for the min and max jerk_dot for given kappa_dot_dot.
-            Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
-        """
-        low, high = -1, 1
-        while high - low > 1e-5:
-            mid = (low + high) / 2
-            if self.safety_verifier.safe_action_check(mid, kappa_ddot, self.ego_action):   high = mid
-            else:   low = mid
-        safe_min = high
-        low, high = -1, 1
-        while high - low > 1e-5:
-            mid = (low + high) / 2
-            if self.safety_verifier.safe_action_check(mid, kappa_ddot, self.ego_action):   low = mid
-            else:   high = mid
-        safe_max = low
-        return safe_min, safe_max
-
     def neighbor_check(self, curr, other):
         """
             0 -> not a neighbor
@@ -909,6 +872,7 @@ class SafetyLayer(CommonroadEnv):
             safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
             if safe_min <= safe_max:    At_safe_l.extend([kdd, safe_min, safe_max])
             else: At_safe_l.extend([kdd,0,0])
+        self.l_id, self.nxt_id = l_id, nxt_id
         return np.array(At_safe_l, dtype=object)
 
     def priority_condition(self, lane : Lanelet,obstacle : Obstacle, D_m=30.0, T_a=3.0):
@@ -972,13 +936,12 @@ class SafetyLayer(CommonroadEnv):
             if self.past_ids[len(self.past_ids) - 2] in route_ids:
                 if route_ids.index(self.past_ids[len(self.past_ids) - 2]) == len(route_ids) - 1:
                     return np.array([])  # simulation is done no next route
-                l_id, nxt_id, kappa_dot_dots = self.wrong_lane_choice_fall_back(route_ids)
+                l_id, nxt_id, fcl_input = self.wrong_lane_choice_fall_back(route_ids)
             else:   return np.array([]) # lost
         else:
             l_id = self.observation_collector.ego_lanelet.lanelet_id
             curr_index = route_ids.index(l_id)
             if curr_index == len(route_ids) - 1:
-                #print("returned empty list")
                 return np.array([]) # simulation is done no next route
             nxt_id = route_ids[curr_index + 1]
             nxt_lane = self.scenario.lanelet_network.find_lanelet_by_id(nxt_id)
@@ -996,10 +959,9 @@ class SafetyLayer(CommonroadEnv):
         kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for kdd in kappa_dot_dots:
             safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
-            if safe_min <= safe_max:
-                At_safe_in.extend([kdd, safe_min, safe_max])
-            else:
-                At_safe_in.extend([kdd , 0, 0])
+            if safe_min <= safe_max:    At_safe_in.extend([kdd, safe_min, safe_max])
+            else:   At_safe_in.extend([kdd , 0, 0])
+        self.l_id, self.nxt_id = l_id, nxt_id
         return np.array(At_safe_in, dtype=object)
 
     @property
