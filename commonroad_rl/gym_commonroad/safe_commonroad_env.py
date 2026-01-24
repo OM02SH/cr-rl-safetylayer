@@ -35,12 +35,38 @@ def traveled_distance(curve: np.ndarray, target):
         d += math.hypot(curve[k][0] - curve[k + 1][0], curve[k][1] - curve[k + 1][1])
     return d
 
-def compute_kappa_dot_dot_helper(ey, e_theta, v, kappa_lane, a_lat_max, kappa, kappa_dot):
-    kappa_corr = -(1.5 * ey) / (v ** 2) - (1.0 * e_theta) / v
+def kappa(laneCenterPoints):
+    xs = laneCenterPoints[:, 0]
+    ys = laneCenterPoints[:, 1]
+    dx = np.gradient(xs)
+    dy = np.gradient(ys)
+    ddx = np.gradient(dx)
+    ddy = np.gradient(dy)
+    # from https://www.storyofmathematics.com/curvature-formula/
+    # Curvature formula k = |x'y'' − y'x''| / (x'^2 + y'^2)^(3/2)
+    denom = (dx * dx + dy * dy) ** 1.5
+    denom[denom < 1e-12] = 1e-12
+    curvature = np.abs(dx * ddy - dy * ddx) / denom
+    return float(np.mean(curvature))
+
+def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, center_points,nct,ncp):
+    try:
+        s, d = ct.convert_to_curvilinear_coords(pos[0][0], pos[0][1])
+    except CartesianProjectionDomainError:
+        ccp = center_points[np.linalg.norm(center_points - pos, axis=1).argmin()]
+        s, _ = ct.convert_to_curvilinear_coords(ccp[0], ccp[1])
+        d = math.dist(pos[0], ccp)
+    def wrap_to_pi(angle):
+        return (angle + np.pi) % (2 * np.pi) - np.pi
+    la = max(5.0, v)
+    local_center = extract_segment(ct, pos, center_points, s, la, ncp, nct)
+    e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
+    kappa_lane = kappa(local_center)
+    kappa_corr = -(1.5 * d) / (v ** 2) - (1.0 * e_theta) / v
     kappa_ref = kappa_lane + kappa_corr
     kappa_max = a_lat_max / (v ** 2)
     kappa_ref = np.clip(kappa_ref, -kappa_max, kappa_max)
-    kappa_ddot = 4.0 * (kappa_ref - kappa) - 2.0 * kappa_dot
+    kappa_ddot = 4.0 * (kappa_ref - kap) - 2.0 * kappa_dot
     return float(np.clip(kappa_ddot / 20.0, -1.0, 1.0))
 
 def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, lookahead, nxt_cps,nct : CurvilinearCoordinateSystem):
@@ -110,21 +136,6 @@ class SafetyVerifier:
         if not hits:    return None
         return hits[:2]
 
-    @staticmethod
-    def kappa(laneCenterPoints):
-        xs = laneCenterPoints[:, 0]
-        ys = laneCenterPoints[:, 1]
-        dx = np.gradient(xs)
-        dy = np.gradient(ys)
-        ddx = np.gradient(dx)
-        ddy = np.gradient(dy)
-        # from https://www.storyofmathematics.com/curvature-formula/
-        # Curvature formula k = |x'y'' − y'x''| / (x'^2 + y'^2)^(3/2)
-        denom = (dx * dx + dy * dy) ** 1.5
-        denom[denom < 1e-12] = 1e-12
-        curvature = np.abs(dx * ddy - dy * ddx) / denom
-        return float(np.mean(curvature))
-
     def obs_start_end_index(self, obs : Obstacle, l_id) -> list[int]:
         obs_state = obs.state_at_time(self.time_step)
         shape = obs.occupancy_at_time(self.time_step).shape
@@ -152,10 +163,13 @@ class SafetyVerifier:
             return center[pt[1] : len(center)], lane, preceding_v, self.prop_ego["v_max"] , 0
         def get_closest_obstacle_lane_velocity_distance(ls: Lanelet):
             lso = ls.get_obstacles(self.scenario.obstacles, self.time_step)
+            cp = self.dense_lanes[ls.lanelet_id][1]
             if len(lso) == 0:
-                r_min = 1.0 / self.kappa(self.dense_lanes[ls.lanelet_id][1])
+                k = kappa(cp)
+                if k == 0:  r_min = math.inf
+                else:   r_min = 1.0 / k
                 v_crit = np.sqrt(r_min * self.prop_ego["a_lat_max"])
-                return min(v_crit,self.prop_ego["v_max"]), traveled_distance(self.dense_lanes[ls.lanelet_id][1], self.dense_lanes[ls.lanelet_id][1][-1]), False
+                return min(v_crit,self.prop_ego["v_max"]), traveled_distance(cp, cp[-1]), False
             else:
                 lso = self.sort_obstacles_in_lane(ls.lanelet_id, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
@@ -163,11 +177,10 @@ class SafetyVerifier:
                 if not pts:
                     s_centers = self.precomputed_lane_polygons[ls.lanelet_id][1]
                     p = np.asarray(lobs_state.position).reshape(1, 2)
-                    closest_centerpoint = np.linalg.norm(self.dense_lanes[ls.lanelet_id][1] - p, axis=1).argmin()
+                    closest_centerpoint = np.linalg.norm(cp - p, axis=1).argmin()
                     s = s_centers[closest_centerpoint]
                     return lobs_state.velocity, s, True
-                return lobs_state.velocity, traveled_distance(self.dense_lanes[ls.lanelet_id][1],
-                                                              self.dense_lanes[ls.lanelet_id][1][pts[0]]), True
+                return lobs_state.velocity, traveled_distance(cp,cp[pts[0]]), True
         s_v_d = []
         for successor in successors:
             v_i, d_i, found = get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successor))
@@ -282,7 +295,7 @@ class SafetyVerifier:
         txj += distance_to_add
         a_lat_max, a_lon_max, w, l, delta_react = (self.prop_ego["a_lat_max"], self.prop_ego["a_lon_max"],
                 self.prop_ego["ego_width"], self.prop_ego["ego_length"], self.prop_ego["delta_react"])
-        k = self.kappa(cp)
+        k = kappa(cp)
         if k == 0:  r_min = math.inf
         else:   r_min = 1.0 / k
         v_crit = min(np.sqrt(r_min * a_lat_max),self.prop_ego["v_max"])
@@ -395,28 +408,14 @@ class SafetyVerifier:
     def compute_kappa_dot_dot(self, l_id, nxt_id, state):
         center_points = self.dense_lanes[l_id][1]
         v = max(state.velocity,0.1)
-        kappa = state.slip_angle
+        kap = state.slip_angle
         kappa_dot = state.yaw_rate
         pos = state.position.reshape(1, 2)
         theta = state.orientation
-        ct = self.precomputed_lane_polygons[l_id][0]
-        try:
-            s, d = ct.convert_to_curvilinear_coords(pos[0][0],pos[0][1])
-        except CartesianProjectionDomainError:
-            ccp = center_points[np.linalg.norm(center_points - pos, axis=1).argmin()]
-            s, _ =  ct.convert_to_curvilinear_coords(ccp[0],ccp[1])
-            d = math.dist(pos[0], ccp)
-        def wrap_to_pi(angle):
-            return (angle + np.pi) % (2 * np.pi) - np.pi
-        la = max(5.0, v)
-        local_center = extract_segment(
-            self.precomputed_lane_polygons[l_id][0],
-            pos,    center_points,  s,  la,
-            self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
-            self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
-        e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
-        kappa_lane = self.kappa(local_center)
-        return compute_kappa_dot_dot_helper(d,e_theta,v,kappa_lane,self.prop_ego["a_lat_max"],kappa,kappa_dot)
+        return compute_kappa_dot_dot_helper(theta, pos, v,self.prop_ego["a_lat_max"],kap,kappa_dot,
+                        self.precomputed_lane_polygons[l_id][0], center_points,
+                        self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
+                        self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
     def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
         """
@@ -824,30 +823,14 @@ class SafetyLayer(CommonroadEnv):
     def compute_kappa_dot_dot(self, l_id, nxt_id):
         center_points = self.dense_lanes[l_id][1]
         v = max(self.observation["v_ego"][0], 0.1)
-        kappa = self.observation["slip_angle"][0]
+        kap = self.observation["slip_angle"][0]
         kappa_dot = self.observation["global_turn_rate"][0]
         pos = self.observation_collector._ego_state.position.reshape(1, 2)
         theta = self.observation_collector._ego_state.orientation
-        ct = self.precomputed_lane_polygons[l_id][0]
-        try:
-            s, d = ct.convert_to_curvilinear_coords(pos[0][0],pos[0][1])
-        except CartesianProjectionDomainError:
-            ccp = center_points[np.linalg.norm(center_points - pos, axis=1).argmin()]
-            s, _ =  ct.convert_to_curvilinear_coords(ccp[0],ccp[1])
-            d = math.dist(pos[0], ccp)
-        def wrap_to_pi(angle):
-            return (angle + np.pi) % (2 * np.pi) - np.pi
-        la = max(5.0, v)
-        local_center = extract_segment(
-            self.precomputed_lane_polygons[l_id][0],
-            pos,    center_points,  s,  la,
-            self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
-            self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
-        e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
-        kappa_lane = self.safety_verifier.kappa(local_center)
-        kdd = compute_kappa_dot_dot_helper(d,e_theta,v,kappa_lane,self.prop_ego["a_lat_max"],kappa,kappa_dot)
-        print(kdd)
-        return kdd
+        return compute_kappa_dot_dot_helper(theta, pos, v, self.prop_ego["a_lat_max"], kap, kappa_dot,
+                                            self.precomputed_lane_polygons[l_id][0], center_points,
+                                            self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
+                                            self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
     def find_safe_jerk_dot(self, kappa_ddot, l_id, nxt_id):
         """
