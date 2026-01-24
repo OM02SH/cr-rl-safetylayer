@@ -49,7 +49,7 @@ def kappa(laneCenterPoints):
     curvature = np.abs(dx * ddy - dy * ddx) / denom
     return float(np.mean(curvature))
 
-def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, center_points,nct,ncp):
+def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, center_points,ncp,nct):
     try:
         s, d = ct.convert_to_curvilinear_coords(pos[0][0], pos[0][1])
     except CartesianProjectionDomainError:
@@ -964,8 +964,6 @@ class SafetyLayer(CommonroadEnv):
         At_safe_in : List[float] = []
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
         if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
-            #print(route_ids)
-            #print("past lanes : ", self.past_ids)
             if self.past_ids[len(self.past_ids) - 2] in route_ids:
                 last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
                 if last_index == len(route_ids) - 1:
