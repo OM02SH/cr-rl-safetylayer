@@ -51,6 +51,9 @@ def kappa(laneCenterPoints):
     return float(np.mean(curvature))
 
 def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, center_points,ncp,nct):
+    """
+
+    """
     try:
         s, d = ct.convert_to_curvilinear_coords(pos[0][0], pos[0][1])
     except CartesianProjectionDomainError:
@@ -482,7 +485,7 @@ class SafetyVerifier:
                                 for p_id in lane.predecessor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
                             lane_polygon = shapely.union_all(valid_road_polygons)
-                            return lane_polygon.contains(rect)
+                            return Polygon(lb + rb[::-1]).contains(rect)
                         if in_safe_space(lp, rp):
                             if l_id == nxt_id == 0:
                                 return True
@@ -514,7 +517,7 @@ class SafetyLayer(CommonroadEnv):
                          logging_path, test_env, play, config_file, logging_mode, **kwargs)
         self.observation = None
         self.past_ids = []
-        self.prop_ego = {"ego_length" : 4.508, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
+        self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.lane_width = 5
         self.last_relative_heading = 0
