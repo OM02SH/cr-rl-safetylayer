@@ -63,9 +63,10 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
     local_center = extract_segment(ct, pos, center_points, s, la, ncp, nct)
     e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
     kappa_ref = kappa(local_center) - (0.8 * d) - (1.5 * e_theta)
+    car_kap = kappa(local_center) - (1.5 * d) / v**2 - e_theta /v
     kappa_max = a_lat_max / (v ** 2)
-    kappa_ref = np.clip(kappa_ref, -kappa_max, kappa_max)
-    kappa_ddot = 4.0 * (kappa_ref - kap) - 2.0 * kappa_dot
+    kappa_ref = np.clip(kappa_ref, - kappa_max, kappa_max)
+    kappa_ddot = 4.0 * (kappa_ref - car_kap) - 2.0 * kappa_dot
     return float(np.clip(kappa_ddot / 20.0, -1.0, 1.0))
 
 def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, lookahead, nxt_cps,nct : CurvilinearCoordinateSystem):
