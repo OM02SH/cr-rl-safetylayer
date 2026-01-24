@@ -871,7 +871,10 @@ class SafetyLayer(CommonroadEnv):
             else:
                 kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for kdd in kappa_dot_dots:
+            print("finding jd for", kdd)
             safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
+            print("safe_min", safe_min)
+            print("safe_max", safe_max)
             if safe_min <= safe_max:    At_safe_l.extend([kdd, safe_min, safe_max])
             else: At_safe_l.extend([kdd,0,0])
         self.l_id, self.nxt_id = l_id, nxt_id
@@ -960,7 +963,10 @@ class SafetyLayer(CommonroadEnv):
                 fcl_input = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,route_ids[curr_index + 1] if len(route_ids) > curr_index + 1 else 0)
         kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for kdd in kappa_dot_dots:
+            print("finding jd for", kdd)
             safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
+            print("safe_min", safe_min)
+            print("safe_max", safe_max)
             if safe_min <= safe_max:    At_safe_in.extend([kdd, safe_min, safe_max])
             else:   At_safe_in.extend([kdd , 0, 0])
         self.l_id, self.nxt_id = l_id, nxt_id
