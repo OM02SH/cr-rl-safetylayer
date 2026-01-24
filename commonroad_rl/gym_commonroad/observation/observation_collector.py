@@ -110,17 +110,17 @@ class ObservationCollector:
         observation_space_dict.update(self.traffic_sign_observation.build_observation_space())
 
         self.observation_space_dict = observation_space_dict
-        if self._flatten_observation:
-            lower_bounds, upper_bounds = np.array([]), np.array([])
-            for space in observation_space_dict.values():
-                lower_bounds = np.concatenate((lower_bounds, space.low))
-                upper_bounds = np.concatenate((upper_bounds, space.high))
-            self.observation_space_size = lower_bounds.shape[0]
-            observation_space = gym.spaces.Box(low=lower_bounds, high=upper_bounds, dtype=np.float64)
-            LOGGER.debug(f"Size of flattened observation space: {self.observation_space_size}")
-        else:
-            observation_space = gym.spaces.Dict(self.observation_space_dict)
-            LOGGER.debug(f"Length of dictionary observation space: {len(self.observation_space_dict)}")
+        #if self._flatten_observation:
+        lower_bounds, upper_bounds = np.array([]), np.array([])
+        for space in observation_space_dict.values():
+            lower_bounds = np.concatenate((lower_bounds, space.low))
+            upper_bounds = np.concatenate((upper_bounds, space.high))
+        self.observation_space_size = lower_bounds.shape[0]
+        observation_space = gym.spaces.Box(low=lower_bounds, high=upper_bounds, dtype=np.float64)
+        LOGGER.debug(f"Size of flattened observation space: {self.observation_space_size}")
+        #else:
+        #    observation_space = gym.spaces.Dict(self.observation_space_dict)
+        #    LOGGER.debug(f"Length of dictionary observation space: {len(self.observation_space_dict)}")
 
         return observation_space
 
