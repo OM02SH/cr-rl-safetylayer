@@ -8,8 +8,9 @@ from shapely.geometry import Polygon
 from shapely.affinity import rotate, translate
 import shapely
 from gymnasium import spaces
+import copy
 
-from commonroad_rl.gym_commonroad.action.action import Action
+from commonroad_rl.gym_commonroad.action.action import Action, ContinuousAction
 from commonroad.scenario.lanelet import Lanelet
 from commonroad.scenario.scenario import Scenario
 from commonroad.planning.planning_problem import PlanningProblem
@@ -61,9 +62,7 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
     la = max(5.0, v)
     local_center = extract_segment(ct, pos, center_points, s, la, ncp, nct)
     e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
-    kappa_lane = kappa(local_center)
-    kappa_corr = -(1.5 * d) / (v ** 2) - (1.0 * e_theta) / v
-    kappa_ref = kappa_lane + kappa_corr
+    kappa_ref = kappa(local_center) - (0.8 * d) - (1.5 * e_theta)
     kappa_max = a_lat_max / (v ** 2)
     kappa_ref = np.clip(kappa_ref, -kappa_max, kappa_max)
     kappa_ddot = 4.0 * (kappa_ref - kap) - 2.0 * kappa_dot
@@ -424,23 +423,23 @@ class SafetyVerifier:
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
+        copy_action : ContinuousAction = copy.deepcopy(ego_action)
         low, high = -0.8, 0.8
         while high - low > 1e-5:
             mid = (low + high) / 2
-            if self.safe_action_check(mid, kappa_ddot, ego_action, k, l_id, nxt_id):   high = mid
+            if self.safe_action_check(mid, kappa_ddot, copy_action, k, l_id, nxt_id):   high = mid
             else:   low = mid
         safe_min = high
         low, high = -0.8, 0.8
         while high - low > 1e-5:
             mid = (low + high) / 2
-            if self.safe_action_check(mid, kappa_ddot, ego_action, k, l_id, nxt_id):   low = mid
+            if self.safe_action_check(mid, kappa_ddot, copy_action, k, l_id, nxt_id):   low = mid
             else:   high = mid
         safe_max = low
         return safe_min, safe_max
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
-        if q == 10:
-            return True
+        if q == 10: return True
         q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
@@ -493,6 +492,7 @@ class SafetyVerifier:
                             else:
                                 kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                             for kdd in kappa_dot_dots:
+                                print(ego_action.vehicle.state.position)
                                 a,b = self.find_safe_jerk_dot(ego_action,kdd,l_id,nxt_id,q)
                                 if a<b: return True
         return False
@@ -508,7 +508,6 @@ class SafetyLayer(CommonroadEnv):
         kwargs["flatten_observation"] = False
         super().__init__(meta_scenario_path, train_reset_config_path, test_reset_config_path, visualization_path,
                          logging_path, test_env, play, config_file, logging_mode, **kwargs)
-        #print("init")
         self.observation = None
         self.past_ids = []
         self.prop_ego = {"ego_length" : 3, "ego_width" : 1.5 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
@@ -711,7 +710,8 @@ class SafetyLayer(CommonroadEnv):
         reward_for_safe_action = 0
         in_conflict = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         in_intersection = True if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys() else False
-        if self.safety_verifier.safe_action_check(action[1],action[0], self.ego_action,0,self.l_id,self.nxt_id):
+        action_copy = copy.deepcopy(self.ego_action)
+        if self.safety_verifier.safe_action_check(action[1],action[0], action_copy,0,self.l_id,self.nxt_id):
             print("safe action")
             reward_for_safe_action = 1
         else:
@@ -732,7 +732,7 @@ class SafetyLayer(CommonroadEnv):
                     if available_kdd == 0:
                         print("no safe action")
                     else:
-                        kdd,j_min,j_max = actions[available_kdd/2]
+                        kdd,j_min,j_max = actions[available_kdd//2]
                         action = [(j_min + j_max) / 2, kdd]
         observation, reward, terminated, truncated, info = super().step(action)
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
