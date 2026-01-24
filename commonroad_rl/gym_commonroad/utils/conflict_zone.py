@@ -19,7 +19,7 @@ from commonroad.geometry.shape import Polygon as Polygon
 import commonroad_dc.pycrcc as pycrcc
 # from commonroad_dc.geometry.geometry import CurvilinearCoordinateSystem
 # from commonroad_dc.pycrccosy import CurvilinearCoordinateSystem
-from commonroad_clcs.pycrccosy import CurvilinearCoordinateSystem
+from commonroad_clcs.pycrccosy import CurvilinearCoordinateSystem, CartesianProjectionDomainError
 # from commonroad_dc.geometry.util import compute_curvature_from_polyline, compute_orientation_from_polyline, \
 #     compute_pathlength_from_polyline, resample_polyline
 from commonroad_clcs.util import compute_curvature_from_polyline, compute_orientation_from_polyline, \
@@ -653,7 +653,7 @@ class ConflictZone(ABC):
             raise ValueError
         try:
             ego_s, _ = cosy.convert_to_curvilinear_coords(position[0], position[1])
-        except ValueError:
+        except (ValueError, CartesianProjectionDomainError):
             # project the results to the center line
             idx = np.argmin(np.linalg.norm(cosy.reference() - position, axis=1))
             pos = cosy.reference()[idx]
