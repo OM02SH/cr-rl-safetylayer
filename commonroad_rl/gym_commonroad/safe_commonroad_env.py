@@ -440,6 +440,7 @@ class SafetyVerifier:
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         if q == 10: return True
+        print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
@@ -492,7 +493,6 @@ class SafetyVerifier:
                             else:
                                 kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                             for kdd in kappa_dot_dots:
-                                print(ego_action.vehicle.state.position)
                                 a,b = self.find_safe_jerk_dot(ego_action,kdd,l_id,nxt_id,q)
                                 if a<b: return True
         return False
