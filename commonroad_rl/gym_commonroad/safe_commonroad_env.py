@@ -440,7 +440,7 @@ class SafetyVerifier:
         return safe_min, safe_max
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
-        if q == 10: return True
+        if q == 8: return True
         #print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
         ego_action.step(np.array([jd,kdd]))
@@ -511,7 +511,7 @@ class SafetyLayer(CommonroadEnv):
                          logging_path, test_env, play, config_file, logging_mode, **kwargs)
         self.observation = None
         self.past_ids = []
-        self.prop_ego = {"ego_length" : 3, "ego_width" : 1.5 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
+        self.prop_ego = {"ego_length" : 4.508, "ego_width" : 1.61 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.lane_width = 5
         self.last_relative_heading = 0
