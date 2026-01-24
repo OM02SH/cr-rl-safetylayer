@@ -209,7 +209,7 @@ env_configs:
     terminate_on_goal_reached: True
     terminate_on_collision: True
     terminate_on_off_road: True
-    terminate_on_time_out: True
+    terminate_on_time_out: False
     terminate_on_friction_violation: False
 
 # A user-specified file for setting the sampling methods and intervals when optimizing observation configurations.
