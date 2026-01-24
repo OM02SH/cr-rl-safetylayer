@@ -52,7 +52,16 @@ def kappa(laneCenterPoints):
 
 def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, center_points,ncp,nct):
     """
-
+        theta       ego orientation
+        pos         ego position
+        v           ego velocity
+        a_lat_max   ego max laterial acceleration
+        kap         ego slip angle
+        kappa_dot   ego yaw rate
+        ct              commonroad clcs with the current lane center as refrence
+        center_points   current lane center points
+        ncp             next lane center points
+        nct             commonroad clcs with the next lane center as refrence
     """
     try:
         s, d = ct.convert_to_curvilinear_coords(pos[0][0], pos[0][1])
@@ -66,10 +75,9 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
     local_center = extract_segment(ct, pos, center_points, s, la, ncp, nct)
     e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
     kappa_ref = kappa(local_center) - (0.8 * d) - (1.5 * e_theta)
-    car_kap = kappa(local_center) - (1.5 * d) / v**2 - e_theta /v
     kappa_max = a_lat_max / (v ** 2)
     kappa_ref = np.clip(kappa_ref, - kappa_max, kappa_max)
-    kappa_ddot = 4.0 * (kappa_ref - car_kap) - 2.0 * kappa_dot
+    kappa_ddot = 4.0 * (kappa_ref - kap) - 2.0 * kappa_dot
     return float(np.clip(kappa_ddot / 20.0, -1.0, 1.0))
 
 def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, lookahead, nxt_cps,nct : CurvilinearCoordinateSystem):
@@ -443,6 +451,19 @@ class SafetyVerifier:
         safe_max = low
         return safe_min, safe_max
 
+    def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
+        """
+            Binary search for the min and max jerk_dot for given kappa_dot_dot.
+            Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
+        """
+        low, high = -0.8, 0.8
+        while high - low > 1e-5:
+            mid = (low + high) / 2
+            copy_action : ContinuousAction = copy.deepcopy(ego_action)
+            if self.safe_action_check(mid, kappa_ddot, copy_action, k, l_id, nxt_id):   return True
+            else:   low = mid
+        return False
+
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         if q == 8:
             print(f"Safe action : {jd} on {ego_action.vehicle.state}")
@@ -477,14 +498,14 @@ class SafetyVerifier:
                                     print("Cartesian projection domain error")
                                     pass
                                 i+=1
-                            valid_road_polygons = [Polygon(lb + rb[::-1]).buffer(0.1)]
+                            """valid_road_polygons = [Polygon(lb + rb[::-1]).buffer(0.1)]
                             if end == len(left_bound):
                                 for s_id in lane.successor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(s_id).polygon.shapely_object.buffer(0))
                             elif start == 0:
                                 for p_id in lane.predecessor:
                                     valid_road_polygons.append(self.scenario.lanelet_network.find_lanelet_by_id(p_id).polygon.shapely_object.buffer(0))
-                            lane_polygon = shapely.union_all(valid_road_polygons)
+                            lane_polygon = shapely.union_all(valid_road_polygons)"""
                             return Polygon(lb + rb[::-1]).contains(rect)
                         if in_safe_space(lp, rp):
                             if l_id == nxt_id == 0:
@@ -500,8 +521,7 @@ class SafetyVerifier:
                             else:
                                 kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                             for kdd in kappa_dot_dots:
-                                a,b = self.find_safe_jerk_dot(ego_action,kdd,l_id,nxt_id,q)
-                                if a<b: return True
+                                if self.find_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
         return False
 
 
