@@ -426,7 +426,7 @@ class SafetyVerifier:
         low, high = -0.8, 0.8
         while high - low > 1e-5:
             mid = (low + high) / 2
-            if self.safe_action_check(mid, kappa_ddot, ego_action,k,l_id,nxt_id):   high = mid
+            if self.safe_action_check(mid, kappa_ddot, ego_action, k, l_id, nxt_id):   high = mid
             else:   low = mid
         safe_min = high
         low, high = -0.8, 0.8
@@ -492,7 +492,7 @@ class SafetyVerifier:
                             else:
                                 kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                             for kdd in kappa_dot_dots:
-                                a,b = self.find_safe_jerk_dot(ego_action,kdd,l_id,nxt_id,p)
+                                a,b = self.find_safe_jerk_dot(ego_action,kdd,l_id,nxt_id,q)
                                 if a<b: return True
         return False
 
