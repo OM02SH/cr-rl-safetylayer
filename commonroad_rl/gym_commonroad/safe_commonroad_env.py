@@ -567,7 +567,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        #print(actions)
+        print(actions)
         if actions.size > 33:   actions = actions[:33]
         elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
@@ -585,7 +585,6 @@ class SafetyLayer(CommonroadEnv):
         plt.show(block=False)"""
         #print(self.observation_collector._ego_state.position)
         #print("")
-        print(actons)
         if terminated:
             print(info)
             print(self.termination_reason)
