@@ -522,8 +522,6 @@ class SafetyVerifier:
                                 kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                             for kdd in kappa_dot_dots:
                                 if self.find_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
-                        else:
-                            print("outside with good speed, lane : ",l_id, " position : ", p)
         return False
 
 
