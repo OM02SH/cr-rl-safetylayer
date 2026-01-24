@@ -504,8 +504,9 @@ class SafetyLayer(CommonroadEnv):
                  test_reset_config_path=PATH_PARAMS["test_reset_config"],
                  visualization_path=PATH_PARAMS["visualization"], logging_path=None, test_env=False, play=False,
                  config_file=PATH_PARAMS["configs"]["commonroad-v1"], logging_mode=1, **kwargs) -> None:
+        kwargs["flatten_observation"] = False
         super().__init__(meta_scenario_path, train_reset_config_path, test_reset_config_path, visualization_path,
-                         logging_path, test_env, play, config_file, logging_mode,flatten_observation=False, **kwargs)
+                         logging_path, test_env, play, config_file, logging_mode, **kwargs)
         #print("init")
         self.observation = None
         self.past_ids = []
