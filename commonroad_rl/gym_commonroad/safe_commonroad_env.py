@@ -783,24 +783,23 @@ class SafetyLayer(CommonroadEnv):
                 reward_for_safe_action = 0
                 print("unsafe action : ", action)
                 actions : np.ndarray = self.observation["safe_actions"]
-                if np.all(actions == 0):
-                    print("no safe action")
+                if np.all(actions == 0):    print("no safe action")
                 else:
                     if self.type == 1:
-                        a = self.safety_verifier.find_safe_jerk_dot(self.ego_action,actions[1],self.l_id,self.nxt_id)
+                        a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[1],self.l_id,self.nxt_id)
                         if a != -2: action = np.array([a,actions[0]])
                         else :
-                            a = self.safety_verifier.find_safe_jerk_dot(self.ego_action,actions[0],self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[0],self.l_id,self.nxt_id)
                             if a != -2: action = np.array([a,actions[0]])
                             else:
-                                a = self.safety_verifier.find_safe_jerk_dot(self.ego_action, actions[0], self.l_id, self.nxt_id)
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[0], self.l_id, self.nxt_id)
                                 if a != -2: action = np.array([a, actions[0]])
                                 else: action = np.array([0,0])
                     elif self.type == 2:
                         fcl_input = float(actions[0]) + 0.1
                         a = -1
                         while a == -2 and fcl_input < 0.8:
-                            a = self.safety_verifier.find_safe_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
                             fcl_input += 0.5
                         if a == -2: a = 0
                         action = np.array([a,fcl_input])
@@ -808,7 +807,7 @@ class SafetyLayer(CommonroadEnv):
                         fcl_input = float(actions[-1]) - 0.1
                         a = -1
                         while a == -2 and fcl_input > -0.8:
-                            a = self.safety_verifier.find_safe_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
                             fcl_input -= 0.5
                         if a == -2: a = 0
                         action = np.array([a,fcl_input])
@@ -818,7 +817,7 @@ class SafetyLayer(CommonroadEnv):
                         for i in range(33):
                             fcl_input = fcl_input + ((0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1)
                             if not (-0.8 <= fcl_input <= 0.8):    continue
-                            a = self.safety_verifier.find_safe_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
                             if a != -2: break
                         action = np.array([a,fcl_input])
                     print("new action ", action)
