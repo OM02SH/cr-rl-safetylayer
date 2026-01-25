@@ -301,7 +301,7 @@ class SafetyVerifier:
             if l_id == self.first_lane:
                 p = ego_state.position
                 W, L = self.prop_ego["ego_width"], self.prop_ego["ego_length"]
-                rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
+                rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)]).buffer(.2)
                 rect = rotate(rect, ego_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
                 rect = translate(rect, xoff=p[0], yoff=p[1])
                 valid_road_polygons.append(rect)
