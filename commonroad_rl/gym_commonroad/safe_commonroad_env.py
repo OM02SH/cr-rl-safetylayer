@@ -448,12 +448,12 @@ class SafetyVerifier:
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
         #print("Printing Safe sets : ")
-        #print("--------------------------------------------------------------------------------------------------------------")
-        #for s in self.safe_set:
-        #    k, lane = s
-        #    for st,e,v,p in k:
-        #        print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
-        #print("--------------------------------------------------------------------------------------------------------------")
+        print("--------------------------------------------------------------------------------------------------------------")
+        for s in self.safe_set:
+            k, lane = s
+            for st,e,v,p in k:
+                print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
+        print("--------------------------------------------------------------------------------------------------------------")
 
     def compute_kappa_dot_dot(self, l_id, nxt_id, state):
         center_points = self.dense_lanes[l_id][1]
@@ -513,12 +513,14 @@ class SafetyVerifier:
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
         for i in range(33):
-            current_val = (0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1
+            current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
+            if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
                 print(f"found feasible jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return True
         return False
+
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         if q == 8:
             print(f"Safe action : {jd} on {ego_action.vehicle.state}")
@@ -556,7 +558,6 @@ class SafetyVerifier:
                             for kdd in kappa_dot_dots:
                                 if self.check_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
         return False
-
 
 class SafetyLayer(CommonroadEnv):
 
