@@ -3,7 +3,6 @@ from collections import defaultdict
 import numpy as np
 from typing import List, Tuple, Optional, Union, Dict
 
-from numpy_typing.content import float64_1d
 from scipy.interpolate import interp1d
 
 from shapely.geometry import Polygon
