@@ -448,12 +448,12 @@ class SafetyVerifier:
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
         #print("Printing Safe sets : ")
-        print("--------------------------------------------------------------------------------------------------------------")
-        for s in self.safe_set:
-            k, lane = s
-            for st,e,v,p in k:
-                print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
-        print("--------------------------------------------------------------------------------------------------------------")
+        #print("--------------------------------------------------------------------------------------------------------------")
+        #for s in self.safe_set:
+        #    k, lane = s
+        #    for st,e,v,p in k:
+        #        print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
+        #print("--------------------------------------------------------------------------------------------------------------")
 
     def compute_kappa_dot_dot(self, l_id, nxt_id, state):
         center_points = self.dense_lanes[l_id][1]
