@@ -821,6 +821,7 @@ class SafetyLayer(CommonroadEnv):
                             a = self.safety_verifier.find_safe_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
                             if a != -2: break
                         action = np.array([a,fcl_input])
+                    print("new action ", action)
         return reward_for_safe_action, action
 
     def step(self, action: Union[np.ndarray, State]) -> Tuple[np.ndarray, float, bool, dict]:
