@@ -448,12 +448,12 @@ class SafetyVerifier:
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
         #print("Printing Safe sets : ")
-        print("--------------------------------------------------------------------------------------------------------------")
-        for s in self.safe_set:
-            k, lane = s
-            for st,e,v,p in k:
-                print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
-        print("--------------------------------------------------------------------------------------------------------------")
+        #print("--------------------------------------------------------------------------------------------------------------")
+        #for s in self.safe_set:
+        #    k, lane = s
+        #    for st,e,v,p in k:
+        #        print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
+        #print("--------------------------------------------------------------------------------------------------------------")
 
     def compute_kappa_dot_dot(self, l_id, nxt_id, state):
         center_points = self.dense_lanes[l_id][1]
@@ -526,6 +526,8 @@ class SafetyVerifier:
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         if q == 4:
+            print(f"checking for jerk dot for {kdd} current jd : {jd} with depth {q} car : "
+                  f"{ego_action.vehicle.state} with postion {ego_action.vehicle.state.position}")
             ego_action.step((np.array(jd,kdd)))
             new_vehicle_state = ego_action.vehicle.state
             p = new_vehicle_state.position
@@ -534,14 +536,25 @@ class SafetyVerifier:
             rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
             rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
             rect = translate(rect, xoff=p[0], yoff=p[1])
-            for l in self.get_reachable_lanes():
-                ct, _, lp, rp = self.precomputed_lane_polygons[l.lanelet_id]
+            try:
+                curr_l = self.scenario.lanelet_network.find_lanelet_by_position(p)
+            except:
+                curr_l = None
+            if curr_l is not None:
                 for s in self.safe_set:
                     k, lane = s
-                    if lane.lanelet_id == l.lanelet_id:
+                    if lane.lanelet_id == curr_l:
                         for start, end, v, poly in k:
-                            if start == end or not (v - 1 <= nv <= v + 1) : continue
+                            if start == end or not (v - 1 <= nv <= v + 1): continue
                             if poly.contains(rect): return True
+            else:
+                for l in self.get_reachable_lanes():
+                    for s in self.safe_set:
+                        k, lane = s
+                        if lane.lanelet_id == l.lanelet_id:
+                            for start, end, v, poly in k:
+                                if start == end or not (v - 1 <= nv <= v + 1) : continue
+                                if poly.contains(rect): return True
             return False
         q += 1
         ego_action.step(np.array([jd,kdd]))
