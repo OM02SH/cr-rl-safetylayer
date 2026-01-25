@@ -978,7 +978,7 @@ class SafetyLayer(CommonroadEnv):
             if self.past_ids[len(self.past_ids) - 2] in route_ids:
                 if route_ids.index(self.past_ids[len(self.past_ids) - 2]) == len(route_ids) - 1:
                     return np.array([])  # simulation is done no next route
-                l_id, nxt_id, fcl_input = self.wrong_lane_choice_fall_back(route_ids)
+                l_id, nxt_id, kappa_dot_dots = self.wrong_lane_choice_fall_back(route_ids)
             else:   return np.array([]) # lost
         else:
             l_id = self.observation_collector.ego_lanelet.lanelet_id
@@ -998,7 +998,7 @@ class SafetyLayer(CommonroadEnv):
                 if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys():
                     self.final_priority = 1
                 fcl_input = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,route_ids[curr_index + 1] if len(route_ids) > curr_index + 1 else 0)
-        kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
+            kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for kdd in kappa_dot_dots:
             print("finding jd in intersection for", kdd)
             safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
