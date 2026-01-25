@@ -466,7 +466,7 @@ class SafetyVerifier:
                         self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
                         self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
-    def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id, k = 0):
+    def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
         """
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
@@ -476,14 +476,18 @@ class SafetyVerifier:
         while high - low > 1e-5:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
-            if self.safe_action_check(mid, kappa_ddot, copy_action, k, l_id, nxt_id):   high = mid
+            if self.safe_action_check(mid, kappa_ddot, copy_action, 0, l_id, nxt_id):
+                print(f"found safe jerk dot in the min loop : {mid} for {kappa_ddot} on {ego_action.vehicle.state} now with depth ")
+                high = mid
             else:   low = mid
         safe_min = high
         low, high = -0.8, 0.8
         while high - low > 1e-5:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
-            if self.safe_action_check(mid, kappa_ddot, copy_action, k, l_id, nxt_id):   low = mid
+            if self.safe_action_check(mid, kappa_ddot, copy_action, 0, l_id, nxt_id):
+                print(f"found safe jerk dot in the max loop : {mid} for {kappa_ddot} on {ego_action.vehicle.state} now with depth ")
+                low = mid
             else:   high = mid
         safe_max = low
         return safe_min, safe_max
@@ -761,7 +765,7 @@ class SafetyLayer(CommonroadEnv):
             print("safe action")
             reward_for_safe_action = 1
         else:
-            a,b =  self.safety_verifier.find_safe_jerk_dot(self.ego_action,action[0],self.l_id,self.nxt_id,0)
+            a,b =  self.safety_verifier.find_safe_jerk_dot(self.ego_action,action[0],self.l_id,self.nxt_id)
             if a<=b:
                 action[0] = min(0,b) if self.observation["v_ego"] > 0 else max(0,a)
                 reward_for_safe_action = 0.5
