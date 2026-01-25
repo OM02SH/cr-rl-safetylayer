@@ -500,7 +500,7 @@ class SafetyVerifier:
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         if q == 8:
-            #print(f"Safe action : {jd} on {ego_action.vehicle.state}")
+            print(f"Safe action : {jd} on {ego_action.vehicle.state}")
             return True
         #print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
