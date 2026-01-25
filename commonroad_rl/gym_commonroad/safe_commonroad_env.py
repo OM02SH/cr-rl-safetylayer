@@ -499,7 +499,7 @@ class SafetyVerifier:
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
         for i in range(33):
-            current_val = (0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1
+            current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
             print(f"searching for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k}")
@@ -548,7 +548,7 @@ class SafetyVerifier:
                             if l_id == nxt_id == 0:
                                 return True
                             kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
-                            if nxt_id != 0 :
+                            """if nxt_id != 0 :
                                 if self.l_id and self.l_id == nxt_id:
                                     kappa_dot_dots = np.linspace(kdd - 0.1, 1,7)
                                 elif self.r_id and self.r_id == nxt_id:
@@ -556,7 +556,8 @@ class SafetyVerifier:
                                 else:
                                     kappa_dot_dots = np.linspace(kdd - 0.05 , kdd + 0.05, 3)
                             else:
-                                kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
+                                kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)"""
+                            kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                             for kdd in kappa_dot_dots:
                                 if self.check_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
         return False
