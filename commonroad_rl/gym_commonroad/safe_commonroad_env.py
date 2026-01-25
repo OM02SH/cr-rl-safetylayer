@@ -502,7 +502,7 @@ class SafetyVerifier:
         if q == 8:
             print(f"Safe action : {jd} on {ego_action.vehicle.state}")
             return True
-        #print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
+        print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
