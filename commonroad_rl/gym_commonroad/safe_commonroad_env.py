@@ -502,6 +502,7 @@ class SafetyVerifier:
             current_val = (0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
+            print(f"searching for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k}")
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
                 print(f"found applicable jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return current_val
@@ -516,6 +517,7 @@ class SafetyVerifier:
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
+            print(f"checking for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k}")
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
                 print(f"found feasible jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return True
