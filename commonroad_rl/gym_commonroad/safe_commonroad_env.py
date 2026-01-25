@@ -490,6 +490,7 @@ class SafetyVerifier:
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
+        print(f"find_feisable_jerk_dot : {kappa_ddot} on {ego_action.vehicle.state} now with depth {k}")
         low, high = -0.8, 0.8
         while high - low > 1e-5:
             mid = (low + high) / 2
@@ -502,7 +503,7 @@ class SafetyVerifier:
         if q == 8:
             print(f"Safe action : {jd} on {ego_action.vehicle.state}")
             return True
-        print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
+        #print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
