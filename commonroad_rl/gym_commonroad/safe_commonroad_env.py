@@ -312,7 +312,7 @@ class SafetyVerifier:
         poly = Polygon(lb + rb[::-1]).buffer(.2)
         valid_road_polygons.append(poly)
         lane_polygon = union_all(valid_road_polygons)
-        lane_polygon.buffer(-1)
+        lane_polygon.buffer(-0.2)
         return lane_polygon
 
     def safeDistanceSetForSection(self, xi:float, yi:float, v_i:float, xj:float, yj:float, v_j:float,cp, l_id, distance_to_add, ego_state) \
@@ -587,7 +587,7 @@ class SafetyVerifier:
                     #return True
                     #if l_id == nxt_id == 0:    return True
                     kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
-                    if kdd > 0.8 or kdd < -0.8: return false
+                    if kdd > 0.8 or kdd < -0.8: return False
                     """if nxt_id != 0 :
                         if self.l_id and self.l_id == nxt_id:
                             kappa_dot_dots = np.linspace(kdd - 0.1, 1,7)
