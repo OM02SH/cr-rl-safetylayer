@@ -291,11 +291,10 @@ class SafetyVerifier:
         return list(obs for obs, obs_center in obs_with_center)
 
     def build_safe_area(self,start,end,l_id, ego_state):
-        _,_,l,r = self.precomputed_lane_polygons[l_id]
-        print("lane : ", l_id)
-        for i in range(l.shape[0]):
-            print(f"{i} distance {r[i][1] - l[i][1]}")
+        print("lane" , l_id)
         lb,c,rb = self.dense_lanes[l_id]
+        for i in range(lb.shape[0]):
+            print(f"{i} distance : ", math.dist(lb[i],rb[i]) )
         valid_road_polygons = []
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
         if end == len(lb) - 1:
