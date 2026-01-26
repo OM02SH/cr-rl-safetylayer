@@ -592,7 +592,7 @@ class SafetyVerifier:
             for start, end, v, poly in k:
                 if v - .1 > nv: break
                 if start == end or not (v - .1 <= nv <= v + .1): continue
-                if start == end or not (v - 1 <= nv <= v + 1) : continue
+                if start == end or not (v - .1 <= nv <= v + .1) : continue
                 if poly.contains(rect):
                     if l_id == nxt_id == 0:
                         return True
