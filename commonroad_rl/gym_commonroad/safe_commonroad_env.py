@@ -293,7 +293,7 @@ class SafetyVerifier:
     def build_safe_area(self,start,end,l_id, ego_state):
         _,_,l,r = self.precomputed_lane_polygons[l_id]
         print("lane : ", l_id)
-        for i in l.shape[0].size:
+        for i in l.shape[0]:
             print(f"{i} distance {r[i][1] - l[i][1]}")
         lb,c,rb = self.dense_lanes[l_id]
         valid_road_polygons = []
