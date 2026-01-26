@@ -840,7 +840,9 @@ class SafetyLayer(CommonroadEnv):
                             else:
                                 a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[0], self.l_id, self.nxt_id,0,1)
                                 if a != -2: action = np.array([a, actions[0]])
-                                else: action = np.array([fall_back_jd,fall_back_kkd])
+                                else:
+                                    a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, 0, self.l_id, self.nxt_id,0,1)
+                                    action = np.array([a,0])
                     elif self.type == 2:
                         fcl_input = float(actions[0]) + 0.1
                         a = -1
