@@ -982,36 +982,22 @@ class SafetyLayer(CommonroadEnv):
         """
         At_safe_l = []
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
-        if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
-            if self.past_ids[len(self.past_ids)-2] in route_ids:
-                if route_ids.index(self.past_ids[len(self.past_ids) - 2]) == len(route_ids) - 1:
-                    self.type = 1
-                    kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
-                    self.l_id, self.nxt_id = self.observation_collector.ego_lanelet.lanelet_id , 0
-                    return kappa_dot_dots  # simulation is done no next route
-                l_id, nxt_id, kappa_dot_dots = self.wrong_lane_choice_fall_back(route_ids)
+        idx = route_ids.index(self.observation_collector.ego_lanelet_id)
+        l_id, nxt_id = self.observation_collector.ego_lanelet.lanelet_id,route_ids[idx + 1] if len(route_ids) > idx + 1 else 0
+        fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
+        if self.observation_collector.ego_lanelet.adj_left_same_direction:
+            if self.observation_collector.ego_lanelet.adj_right_same_direction:
+                self.type = 4
+                kappa_dot_dots = np.linspace(-0.8, 0.8, 11) # left, current and right
             else:
-                self.type = 1
-                kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
-                self.l_id, self.nxt_id = self.observation_collector.ego_lanelet.lanelet_id, 0
-                return kappa_dot_dots # lost
-        else :
-            idx = route_ids.index(self.observation_collector.ego_lanelet_id)
-            l_id, nxt_id = self.observation_collector.ego_lanelet.lanelet_id,route_ids[idx + 1] if len(route_ids) > idx + 1 else 0
-            fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
-            if self.observation_collector.ego_lanelet.adj_left_same_direction:
-                if self.observation_collector.ego_lanelet.adj_right_same_direction:
-                    self.type = 4
-                    kappa_dot_dots = np.linspace(-0.8, 0.8, 11) # left, current and right
-                else:
-                    self.type = 2
-                    kappa_dot_dots = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
-            elif self.observation_collector.ego_lanelet.adj_right_same_direction:
-                self.type = 3
-                kappa_dot_dots = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
-            else:
-                self.type = 1
-                kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
+                self.type = 2
+                kappa_dot_dots = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
+        elif self.observation_collector.ego_lanelet.adj_right_same_direction:
+            self.type = 3
+            kappa_dot_dots = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
+        else:
+            self.type = 1
+            kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for kdd in kappa_dot_dots:
             #print("finding jd for in lane ", kdd)
             #safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
