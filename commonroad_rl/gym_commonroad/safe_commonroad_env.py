@@ -341,7 +341,7 @@ class SafetyVerifier:
         v_crit = min(np.sqrt(r_min * a_lat_max),self.prop_ego["v_max"])
         # s >= s_i + Δ_safe(v, i)
         # s <= s_j - Δ_safe(v, j)
-        vs = np.linspace(0, v_crit, 50)
+        vs = np.linspace(0, v_crit, 500)
         safe_states = []
         # a_lon(v) = a_lon_max * sqrt( 1 - (v^2 / v_crit^2)^2 )
         def a_lon(v, a_lon_max, v_crit ):
@@ -545,7 +545,8 @@ class SafetyVerifier:
                     k, lane = s
                     if lane.lanelet_id == curr_l:
                         for start, end, v, poly in k:
-                            if start == end or not (v - 1 <= nv <= v + 1): continue
+                            if v - .1 > nv: break
+                            if start == end or not (v - .1 <= nv <= v + .1): continue
                             if poly.contains(rect): return True
             else:
                 for l in self.get_reachable_lanes():
