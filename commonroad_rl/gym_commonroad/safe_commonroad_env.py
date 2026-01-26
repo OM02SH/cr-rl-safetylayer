@@ -291,6 +291,10 @@ class SafetyVerifier:
         return list(obs for obs, obs_center in obs_with_center)
 
     def build_safe_area(self,start,end,l_id, ego_state):
+        _,_,l,r = self.precomputed_lane_polygons[l_id]
+        print("lane : ", l_id)
+        for i in l.shape[0].size:
+            print(f"{i} distance {r[i][1] - l[i][1]}")
         lb,c,rb = self.dense_lanes[l_id]
         valid_road_polygons = []
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
@@ -449,10 +453,10 @@ class SafetyVerifier:
         self.safe_set = S
         #print("Printing Safe sets : ")
         #print("--------------------------------------------------------------------------------------------------------------")
-        #for s in self.safe_set:
-        #    k, lane = s
-        #    for st,e,v,p in k:
-        #        print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
+        for s in self.safe_set:
+            k, lane = s
+            for st,e,v,p in k:
+                print(f"safe set in lane {lane.lanelet_id} starting {st} ending {e} at {v} wiht area {p.area}")
         #print("--------------------------------------------------------------------------------------------------------------")
 
     def compute_kappa_dot_dot(self, l_id, nxt_id, state):
@@ -614,7 +618,7 @@ class SafetyLayer(CommonroadEnv):
                          logging_path, test_env, play, config_file, logging_mode, **kwargs)
         self.observation = None
         self.past_ids = []
-        self.prop_ego = {"ego_length" : 2.5, "ego_width" : 1 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
+        self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.6 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.lane_width = 5
         self.last_relative_heading = 0
