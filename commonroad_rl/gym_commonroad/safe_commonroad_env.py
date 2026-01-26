@@ -645,12 +645,7 @@ class SafetyLayer(CommonroadEnv):
             for k in observation_dict.keys():
                 if k in ["safe_actions", "final_priority", "distance_to_lane_end"] : continue
                 size = np.prod(self.observation_dict[k].shape)
-                try:
-                    observation_vector[index: index + size] = observation_dict[k].flat
-                except ValueError as s:
-                    print(size , "   ", index, "   " , k)
-                    print(s)
-                    exit(1)
+                observation_vector[index: index + size] = observation_dict[k].flat
                 index += size
             return observation_vector
         base = pack_orig()
@@ -694,6 +689,7 @@ class SafetyLayer(CommonroadEnv):
         if terminated:
             print(info)
             print(self.termination_reason)
+            for k in self.observation.keys():   print(k, " : ", self.observation[k])
         return observation_vector
 
     def get_distance_to_lane_end(self):
@@ -717,6 +713,8 @@ class SafetyLayer(CommonroadEnv):
         self.in_or_entering_intersection = self.intersection_check()
         self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
         self.pre_intersection_lanes = None
+        print("distance_goal_long : ", self.observation["distance_to_lane_end"])
+        print("distance_goal_lat : ", self.observation["distance_goal_lat"])
         observation_vector = self.apply_safety(initial_observation,info,False)
         return observation_vector, info
 
