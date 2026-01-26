@@ -467,11 +467,11 @@ class SafetyVerifier:
                         self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
                         self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
-    def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
-        """
+    """def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
+        ""
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
-        """
+        ""
         print(l_id, nxt_id, kappa_ddot)
         low, high = -0.8, 0.8
         while high - low > 1e-5:
@@ -492,8 +492,9 @@ class SafetyVerifier:
             else:   high = mid
         safe_max = low
         return safe_min, safe_max
+"""
 
-    def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
+    def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0, type = 1):
         """
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
@@ -503,12 +504,12 @@ class SafetyVerifier:
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
           #  print(f"searching for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k}")
-            if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
+            if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id,type):
                 print(f"found applicable jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return current_val
         return -2
 
-    def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
+    def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0,type = 1):
         """
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
@@ -519,7 +520,7 @@ class SafetyVerifier:
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
             #print(f"checking for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k} car : {copy_action.vehicle.state}"
              #     f"with postion {copy_action.vehicle.state.position}")
-            if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
+            if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id,type):
                 print(f"found feasible jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return True
         return False
@@ -566,7 +567,7 @@ class SafetyVerifier:
             if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):  return True
         return False"""
 
-    def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
+    def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0, type = 1):
         if q == 4:
             print(f"Safe action : {jd} on {ego_action.vehicle.state}")
             return True
@@ -605,6 +606,7 @@ class SafetyVerifier:
                             kappa_dot_dots = np.linspace(kdd - 0.05 , kdd + 0.05, 3)
                     else:
                         kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)"""
+                    if self.check_feisable_jerk_dot(ego_action, 0, l_id, nxt_id, q):   return True
                     kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                     for kdd in kappa_dot_dots:
                         if self.check_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
@@ -826,7 +828,7 @@ class SafetyLayer(CommonroadEnv):
             print("safe action : ", action)
             reward_for_safe_action = 1
         else:
-            a =  self.safety_verifier.find_feisable_jerk_dot(self.ego_action,action[1],self.l_id,self.nxt_id)
+            a =  self.safety_verifier.find_feisable_jerk_dot(self.ego_action,action[1],self.l_id,self.nxt_id,0,1)
             if a != -2:
                 action[0] = a
                 reward_for_safe_action = 0.5
@@ -838,20 +840,20 @@ class SafetyLayer(CommonroadEnv):
                 if np.all(actions == 0):    print("no safe action")
                 else:
                     if self.type == 1:
-                        a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[1],self.l_id,self.nxt_id)
+                        a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[1],self.l_id,self.nxt_id,0,1)
                         if a != -2: action = np.array([a,actions[0]])
                         else :
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[0],self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[0],self.l_id,self.nxt_id,0,1)
                             if a != -2: action = np.array([a,actions[0]])
                             else:
-                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[0], self.l_id, self.nxt_id)
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[0], self.l_id, self.nxt_id,0,1)
                                 if a != -2: action = np.array([a, actions[0]])
                                 else: action = np.array([0,0])
                     elif self.type == 2:
                         fcl_input = float(actions[0]) + 0.1
                         a = -1
                         while a == -2 and fcl_input < 0.8:
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,2)
                             fcl_input += 0.5
                         if a == -2: a = 0
                         action = np.array([a,fcl_input])
@@ -859,7 +861,7 @@ class SafetyLayer(CommonroadEnv):
                         fcl_input = float(actions[-1]) - 0.1
                         a = -1
                         while a == -2 and fcl_input > -0.8:
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,3)
                             fcl_input -= 0.5
                         if a == -2: a = 0
                         action = np.array([a,fcl_input])
@@ -869,7 +871,7 @@ class SafetyLayer(CommonroadEnv):
                         for i in range(33):
                             fcl_input = fcl_input + ((0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1)
                             if not (-0.8 <= fcl_input <= 0.8):    continue
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id)
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,1)
                             if a != -2: break
                         action = np.array([a,fcl_input])
                     print("new action ", action)
