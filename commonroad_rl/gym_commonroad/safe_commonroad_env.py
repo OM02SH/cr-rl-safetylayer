@@ -526,8 +526,8 @@ class SafetyVerifier:
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         if q == 4:
-            print(f"checking for jerk dot for {kdd} current jd : {jd} with depth {q} car : "
-                  f"{ego_action.vehicle.state} with postion {ego_action.vehicle.state.position}")
+            #print(f"checking for jerk dot for {kdd} current jd : {jd} with depth {q} car : "
+             #     f"{ego_action.vehicle.state} with postion {ego_action.vehicle.state.position}")
             ego_action.step((np.array(jd,kdd)))
             new_vehicle_state = ego_action.vehicle.state
             p = new_vehicle_state.position
