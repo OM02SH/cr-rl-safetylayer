@@ -499,7 +499,7 @@ class SafetyVerifier:
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
-          #  print(f"searching for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k}")
+            #print(f"searching for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k}")
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id,type):
                 print(f"found applicable jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return current_val
@@ -560,9 +560,9 @@ class SafetyVerifier:
         return False"""
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0, type = 1):
-        if q == 3:
-            print(f"Safe action : {jd} on {ego_action.vehicle.state}")
-            return True
+        #if q == 3:
+        #    print(f"Safe action : {jd} on {ego_action.vehicle.state}")
+        #    return True
         # print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
         ego_action.step(np.array([jd,kdd]))
@@ -585,6 +585,7 @@ class SafetyVerifier:
                 if v - .1 > nv: break
                 if start == end or not (v - .1 <= nv <= v + .1) : continue
                 if poly.contains(rect):
+                    return True
                     #if l_id == nxt_id == 0:    return True
                     #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
                     """if nxt_id != 0 :
@@ -596,7 +597,7 @@ class SafetyVerifier:
                             kappa_dot_dots = np.linspace(kdd - 0.05 , kdd + 0.05, 3)
                     else:
                         kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)"""
-                    if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
+                    #if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
                     #kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                     #for kdd in kappa_dot_dots:
                     #    if self.check_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
@@ -842,7 +843,8 @@ class SafetyLayer(CommonroadEnv):
                                 if a != -2: action = np.array([a, actions[0]])
                                 else:
                                     a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, 0, self.l_id, self.nxt_id,0,1)
-                                    action = np.array([a,0])
+                                    if a != -2: action = np.array([a,0])
+                                    else: action = np.array([fall_back_jd,fall_back_kkd])
                     elif self.type == 2:
                         fcl_input = float(actions[0]) + 0.1
                         a = -1
