@@ -291,10 +291,6 @@ class SafetyVerifier:
         return list(obs for obs, obs_center in obs_with_center)
 
     def build_safe_area(self,start,end,l_id, ego_state):
-        print("lane" , l_id)
-        lb,c,rb = self.dense_lanes[l_id]
-        for i in range(lb.shape[0]):
-            print(f"{i} distance : ", math.dist(lb[i],rb[i]) )
         valid_road_polygons = []
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
         if end == len(lb) - 1:
@@ -599,7 +595,7 @@ class SafetyVerifier:
                             kappa_dot_dots = np.linspace(kdd - 0.05 , kdd + 0.05, 3)
                     else:
                         kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)"""
-                    if self.check_feisable_jerk_dot(ego_action, 0, l_id, nxt_id, q):   return True
+                    if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
                     #kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                     #for kdd in kappa_dot_dots:
                     #    if self.check_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
