@@ -495,10 +495,6 @@ class SafetyVerifier:
 """
 
     def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0, type = 1):
-        """
-            Binary search for the min and max jerk_dot for given kappa_dot_dot.
-            Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
-        """
         for i in range(11):
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
@@ -510,10 +506,6 @@ class SafetyVerifier:
         return -2
 
     def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0,type = 1):
-        """
-            Binary search for the min and max jerk_dot for given kappa_dot_dot.
-            Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
-        """
         for i in range(11):
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
@@ -890,7 +882,7 @@ class SafetyLayer(CommonroadEnv):
         if reward_for_safe_action:
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
-        else:   reward -= 800
+        else:   reward -= 80
         self.observation = observation
         self.get_distance_to_lane_end()
         self.time_step += 1
@@ -936,12 +928,12 @@ class SafetyLayer(CommonroadEnv):
                 else:
                     if action[1] < 0.1:
                         slowing_in_conflict_zone = 1
-        return (600  *  reward_for_exiting_conflict_zone +
-                -200  *  penalty_for_slowing_down_in_conflict_zone +
-                -200  *  priority_non_compliance +
-                -500  *  entering_occupied_conflict_zone +
-                -100  *  not_slowing_occupied_conflict_zone +
-                -100  *  slowing_in_conflict_zone)
+        return (60  *  reward_for_exiting_conflict_zone +
+                -20  *  penalty_for_slowing_down_in_conflict_zone +
+                -20  *  priority_non_compliance +
+                -50  *  entering_occupied_conflict_zone +
+                -10  *  not_slowing_occupied_conflict_zone +
+                -10  *  slowing_in_conflict_zone)
 
     def intersection_check(self):
         a_max = 5
