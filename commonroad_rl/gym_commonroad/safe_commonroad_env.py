@@ -801,7 +801,7 @@ class SafetyLayer(CommonroadEnv):
                             is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])))
 
     def check_safety(self,action,action_copy):
-        fall_back_kkd = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
+        fall_back_kkd = -0.2 if self.observation["global_turn_rate"] > 2 else 0.2 if self.observation["global_turn_rate"] < -0.2 else 0.0
         fall_back_jd =  -0.2 if self.observation["jerk_ego"] > 2 else 0.2
         if self.safety_verifier.safe_action_check(action[0],action[1], action_copy,0,self.l_id,self.nxt_id):
             #print("safe action : ", action)
@@ -857,7 +857,7 @@ class SafetyLayer(CommonroadEnv):
                             if a != -2: break
                         if a == -2: a = fall_back_jd
                         action = np.array([a,fcl_input])
-                    print("new action ", action)
+                    #print("new action ", action)
             #print("current position : ", self.ego_action.vehicle.state.position)
         return reward_for_safe_action, action
 
@@ -985,9 +985,16 @@ class SafetyLayer(CommonroadEnv):
         if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
             if self.past_ids[len(self.past_ids)-2] in route_ids:
                 if route_ids.index(self.past_ids[len(self.past_ids) - 2]) == len(route_ids) - 1:
-                    return np.array([])  # simulation is done no next route
+                    self.type = 1
+                    kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
+                    self.l_id, self.nxt_id = self.observation_collector.ego_lanelet.lanelet_id , 0
+                    return kappa_dot_dots  # simulation is done no next route
                 l_id, nxt_id, kappa_dot_dots = self.wrong_lane_choice_fall_back(route_ids)
-            else:   return np.array([]) # lost
+            else:
+                self.type = 1
+                kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
+                self.l_id, self.nxt_id = self.observation_collector.ego_lanelet.lanelet_id, 0
+                return kappa_dot_dots # lost
         else :
             idx = route_ids.index(self.observation_collector.ego_lanelet_id)
             l_id, nxt_id = self.observation_collector.ego_lanelet.lanelet_id,route_ids[idx + 1] if len(route_ids) > idx + 1 else 0
