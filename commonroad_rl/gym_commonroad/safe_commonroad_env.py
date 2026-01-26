@@ -291,6 +291,7 @@ class SafetyVerifier:
         return list(obs for obs, obs_center in obs_with_center)
 
     def build_safe_area(self,start,end,l_id, ego_state):
+        lb,c,rb = self.dense_lanes[l_id]
         valid_road_polygons = []
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
         if end == len(lb) - 1:
@@ -301,7 +302,7 @@ class SafetyVerifier:
             if l_id == self.first_lane:
                 p = ego_state.position
                 W, L = self.prop_ego["ego_width"], self.prop_ego["ego_length"]
-                rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)]).buffer(.2)
+                rect = Polygon([(-L / 2, -W), (-L / 2, W), (L / 2, W), (L / 2, -W)]).buffer(.2)
                 rect = rotate(rect, ego_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
                 rect = translate(rect, xoff=p[0], yoff=p[1])
                 valid_road_polygons.append(rect)
