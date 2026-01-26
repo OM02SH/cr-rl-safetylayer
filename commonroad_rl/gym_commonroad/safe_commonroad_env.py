@@ -823,14 +823,14 @@ class SafetyLayer(CommonroadEnv):
 
     def check_safety(self,action,action_copy):
         if self.safety_verifier.safe_action_check(action[0],action[1], action_copy,0,self.l_id,self.nxt_id):
-            print("safe action")
+            print("safe action : ", action)
             reward_for_safe_action = 1
         else:
             a =  self.safety_verifier.find_feisable_jerk_dot(self.ego_action,action[1],self.l_id,self.nxt_id)
             if a != -2:
                 action[0] = a
                 reward_for_safe_action = 0.5
-                print("half safe action")
+                print("half safe action : ", action)
             else:
                 reward_for_safe_action = 0
                 print("unsafe action : ", action)
@@ -873,6 +873,7 @@ class SafetyLayer(CommonroadEnv):
                             if a != -2: break
                         action = np.array([a,fcl_input])
                     print("new action ", action)
+            print("current position : ", self.ego_action.vehicle.state.position)
         return reward_for_safe_action, action
 
     def step(self, action: Union[np.ndarray, State]) -> Tuple[np.ndarray, float, bool, dict]:
