@@ -467,11 +467,11 @@ class SafetyVerifier:
                         self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
                         self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
-    """def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
-        ""
+    def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
+        """
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
-        ""
+        """
         print(l_id, nxt_id, kappa_ddot)
         low, high = -0.8, 0.8
         while high - low > 1e-5:
@@ -492,7 +492,6 @@ class SafetyVerifier:
             else:   high = mid
         safe_max = low
         return safe_min, safe_max
-"""
 
     def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0, type = 1):
         for i in range(11):
@@ -560,10 +559,10 @@ class SafetyVerifier:
         return False"""
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0, type = 1):
-        #if q == 3:
-        #    print(f"Safe action : {jd} on {ego_action.vehicle.state}")
-        #    return True
-        # print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
+        if q == 3:
+            print(f"Safe action : {jd} on {ego_action.vehicle.state}")
+            return True
+        #print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
@@ -585,9 +584,10 @@ class SafetyVerifier:
                 if v - .1 > nv: break
                 if start == end or not (v - .1 <= nv <= v + .1) : continue
                 if poly.contains(rect):
-                    return True
+                    #return True
                     #if l_id == nxt_id == 0:    return True
-                    #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
+                    kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
+                    if kdd > 0.8 or kdd < -0.8: return false
                     """if nxt_id != 0 :
                         if self.l_id and self.l_id == nxt_id:
                             kappa_dot_dots = np.linspace(kdd - 0.1, 1,7)
@@ -597,7 +597,7 @@ class SafetyVerifier:
                             kappa_dot_dots = np.linspace(kdd - 0.05 , kdd + 0.05, 3)
                     else:
                         kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)"""
-                    #if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
+                    if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
                     #kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                     #for kdd in kappa_dot_dots:
                     #    if self.check_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
@@ -687,7 +687,7 @@ class SafetyLayer(CommonroadEnv):
         #print(self.observation_collector._ego_state.position)
         #print("")
         if terminated:
-            print(info)
+            #print(info)
             print(self.termination_reason)
             for k in self.observation.keys():   print(k, " : ", self.observation[k])
         return observation_vector
