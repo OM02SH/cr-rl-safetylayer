@@ -478,7 +478,7 @@ class SafetyVerifier:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
             if self.safe_action_check(mid, kappa_ddot, copy_action, 0, l_id, nxt_id):
-                print(f"found safe jerk dot in the min loop : {mid} for {kappa_ddot} on {ego_action.vehicle.state} now with depth ")
+                #print(f"found safe jerk dot in the min loop : {mid} for {kappa_ddot} on {ego_action.vehicle.state} now with depth ")
                 high = mid
             else:   low = mid
         safe_min = high
@@ -487,7 +487,7 @@ class SafetyVerifier:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
             if self.safe_action_check(mid, kappa_ddot, copy_action, 0, l_id, nxt_id):
-                print(f"found safe jerk dot in the max loop : {mid} for {kappa_ddot} on {ego_action.vehicle.state} now with depth ")
+                #print(f"found safe jerk dot in the max loop : {mid} for {kappa_ddot} on {ego_action.vehicle.state} now with depth ")
                 low = mid
             else:   high = mid
         safe_max = low
@@ -500,7 +500,7 @@ class SafetyVerifier:
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
             #print(f"searching for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k}")
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id,type):
-                print(f"found applicable jerk dot : {current_val} for {kappa_ddot} with depth {k}")
+                #print(f"found applicable jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return current_val
         return -2
 
@@ -512,7 +512,7 @@ class SafetyVerifier:
             #print(f"checking for jerk dot for {kappa_ddot} current jd : {current_val} with depth {k} car : {copy_action.vehicle.state}"
              #     f"with postion {copy_action.vehicle.state.position}")
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id,type):
-                print(f"found feasible jerk dot : {current_val} for {kappa_ddot} with depth {k}")
+                #print(f"found feasible jerk dot : {current_val} for {kappa_ddot} with depth {k}")
                 return True
         return False
 
