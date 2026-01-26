@@ -668,7 +668,7 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        #print(actions)
+        print(actions)
         if actions.size > 11:   actions = actions[:11]
         elif actions.size < 11:   actions = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
@@ -686,10 +686,10 @@ class SafetyLayer(CommonroadEnv):
         plt.show(block=False)"""
         #print(self.observation_collector._ego_state.position)
         #print("")
-        #if terminated:
-        #    print(info)
-        #    print(self.termination_reason)
-        #    for k in self.observation.keys():   print(k, " : ", self.observation[k])
+        if terminated:
+            print(info)
+            print(self.termination_reason)
+            for k in self.observation.keys():   print(k, " : ", self.observation[k])
         return observation_vector
 
     def get_distance_to_lane_end(self):
@@ -702,7 +702,7 @@ class SafetyLayer(CommonroadEnv):
               planning_problem: PlanningProblem = None) -> np.ndarray:
         self.past_ids = []
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
-        #print(self.observation_collector._scenario.scenario_id)
+        print(self.observation_collector._scenario.scenario_id)
         self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
@@ -713,6 +713,8 @@ class SafetyLayer(CommonroadEnv):
         self.in_or_entering_intersection = self.intersection_check()
         self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
         self.pre_intersection_lanes = None
+        print("distance_goal_long : ", self.observation["distance_to_lane_end"])
+        print("distance_goal_lat : ", self.observation["distance_goal_lat"])
         observation_vector = self.apply_safety(initial_observation,info,False)
         return observation_vector, info
 
@@ -783,13 +785,23 @@ class SafetyLayer(CommonroadEnv):
             center_dense = np.delete(center_dense, to_remove, axis=0)
             right_dense = np.delete(right_dense, to_remove, axis=0)
             left_dense = np.delete(left_dense, to_remove, axis=0)
+            if type(center_dense) is not np.ndarray:
+                print("Center dense is not a numpy array")
+                print(l.center_vertices)
+                print(l.left_vertices)
+                print(l.right_vertices)
+                print(to_remove)
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             left = np.array(left)
             right = np.array(right)
             s_centers = np.array([])
             for x, y in center_dense:
-                s, d = ct.convert_to_curvilinear_coords(x, y)
-                s_centers = np.append(s_centers, s)
+                try:
+                    s, d = ct.convert_to_curvilinear_coords(x, y)
+                    s_centers = np.append(s_centers, s)
+                except CartesianProjectionDomainError:
+                    print("error in converting")
+                    pass
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, s_centers, left, right)
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
@@ -801,20 +813,20 @@ class SafetyLayer(CommonroadEnv):
                             is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])))
 
     def check_safety(self,action,action_copy):
-        fall_back_kkd = -0.2 if self.observation["global_turn_rate"] > 2 else 0.2 if self.observation["global_turn_rate"] < -0.2 else 0.0
+        fall_back_kkd = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,0)
         fall_back_jd =  -0.2 if self.observation["jerk_ego"] > 2 else 0.2
         if self.safety_verifier.safe_action_check(action[0],action[1], action_copy,0,self.l_id,self.nxt_id):
-            #print("safe action : ", action)
+            print("safe action : ", action)
             reward_for_safe_action = 1
         else:
             a =  self.safety_verifier.find_feisable_jerk_dot(self.ego_action,action[1],self.l_id,self.nxt_id,0,1)
             if a != -2:
                 action[0] = a
                 reward_for_safe_action = 0.5
-                #print("half safe action : ", action)
+                print("half safe action : ", action)
             else:
                 reward_for_safe_action = 0
-                #print("unsafe action : ", action)
+                print("unsafe action : ", action)
                 actions : np.ndarray = self.observation["safe_actions"]
                 if np.all(actions == 0):    print("no safe action")
                 else:
@@ -857,8 +869,8 @@ class SafetyLayer(CommonroadEnv):
                             if a != -2: break
                         if a == -2: a = fall_back_jd
                         action = np.array([a,fcl_input])
-                    #print("new action ", action)
-            #print("current position : ", self.ego_action.vehicle.state.position)
+                    print("new action ", action)
+            print("current position : ", self.ego_action.vehicle.state.position)
         return reward_for_safe_action, action
 
     def step(self, action: Union[np.ndarray, State]) -> Tuple[np.ndarray, float, bool, dict]:
@@ -879,7 +891,7 @@ class SafetyLayer(CommonroadEnv):
         self.in_or_entering_intersection = self.intersection_check()
         self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
         observation_vector = self.apply_safety(observation, info, terminated)
-        # print("Final reward : ", reward)
+        print("Final reward : ", reward)
         return observation_vector, reward, terminated, truncated, info
 
     def safe_reward(self, action, in_intersection, in_conflict):
@@ -982,22 +994,29 @@ class SafetyLayer(CommonroadEnv):
         """
         At_safe_l = []
         route_ids = self.observation_collector.navigator.route.list_ids_lanelets
-        idx = route_ids.index(self.observation_collector.ego_lanelet_id)
-        l_id, nxt_id = self.observation_collector.ego_lanelet.lanelet_id,route_ids[idx + 1] if len(route_ids) > idx + 1 else 0
-        fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
-        if self.observation_collector.ego_lanelet.adj_left_same_direction:
-            if self.observation_collector.ego_lanelet.adj_right_same_direction:
-                self.type = 4
-                kappa_dot_dots = np.linspace(-0.8, 0.8, 11) # left, current and right
+        if self.observation_collector.ego_lanelet.lanelet_id not in route_ids:
+            if self.past_ids[len(self.past_ids)-2] in route_ids:
+                if route_ids.index(self.past_ids[len(self.past_ids) - 2]) == len(route_ids) - 1:
+                    return np.array([])  # simulation is done no next route
+                l_id, nxt_id, kappa_dot_dots = self.wrong_lane_choice_fall_back(route_ids)
+            else:   return np.array([]) # lost
+        else :
+            idx = route_ids.index(self.observation_collector.ego_lanelet_id)
+            l_id, nxt_id = self.observation_collector.ego_lanelet.lanelet_id,route_ids[idx + 1] if len(route_ids) > idx + 1 else 0
+            fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
+            if self.observation_collector.ego_lanelet.adj_left_same_direction:
+                if self.observation_collector.ego_lanelet.adj_right_same_direction:
+                    self.type = 4
+                    kappa_dot_dots = np.linspace(-0.8, 0.8, 11) # left, current and right
+                else:
+                    self.type = 2
+                    kappa_dot_dots = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
+            elif self.observation_collector.ego_lanelet.adj_right_same_direction:
+                self.type = 3
+                kappa_dot_dots = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
             else:
-                self.type = 2
-                kappa_dot_dots = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
-        elif self.observation_collector.ego_lanelet.adj_right_same_direction:
-            self.type = 3
-            kappa_dot_dots = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
-        else:
-            self.type = 1
-            kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
+                self.type = 1
+                kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for kdd in kappa_dot_dots:
             #print("finding jd for in lane ", kdd)
             #safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
