@@ -132,7 +132,7 @@ class SafetyVerifier:
                 elif k == 1: self.succsesors_to_addl.append(l_id)
                 elif k == 2: self.succsesors_to_addr.append(l_id)
                 if succ_len < needed:
-                    lanes.extend(add_successors(s, needed - succ_len))
+                    lanes.extend(add_successors(s, needed - succ_len,0))
             return lanes
         for l_id in self.ego_lanelet.successor:
             lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
