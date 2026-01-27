@@ -262,8 +262,8 @@ class SafetyVerifier:
                 v = v_i
         return center[pt[1] : len(center)], lane, preceding_v, v , d
 
-    def get_lane_collision_free_areas(self, lane : Lanelet) -> List[np.ndarray,Lanelet,float,float,float]:
-        C : List[np.ndarray,Lanelet,float,float,float] = []
+    def get_lane_collision_free_areas(self, lane : Lanelet) -> List[Tuple[np.ndarray,Lanelet,float,float,float]]:
+        C : List[Tuple[np.ndarray,Lanelet,float,float,float]] = []
         center = self.dense_lanes[lane.lanelet_id][1]
         obs = lane.get_obstacles(self.scenario.obstacles, self.time_step)
         if len(obs) == 0:   # empty lane with no vehicle entering or exiting it
