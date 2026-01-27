@@ -115,14 +115,11 @@ eval_callback = EvalCallback(testing_env,
                              callback_on_new_best=save_vec_normalize_callback,
                              verbose=1)
 from stable_baselines3 import PPO
-
-# Create the model together with its model hyperparameters and the training environment
-# model = PPO2(env=training_env, **hyperparams)
 model = PPO(env=training_env, **hyperparams)
-
-# Start the learning process with the evaluation callback
-n_timesteps=5000
-model.learn(n_timesteps, eval_callback)
+model.learn(
+    total_timesteps=10000,
+    callback=eval_callback
+)
 
 model.save("tutorials/logs/intermediate_model")
 
