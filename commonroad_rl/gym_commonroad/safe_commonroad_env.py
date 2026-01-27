@@ -560,7 +560,7 @@ class SafetyVerifier:
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0, type = 1):
         if q == 1:
-            print(f"Safe action : {jd} on {ego_action.vehicle.state}")
+            #print(f"Safe action : {jd} on {ego_action.vehicle.state}")
             return True
         #print(f"checking safe action : {jd},{kdd} on {ego_action.vehicle.state} now with depth {q}")
         q += 1
@@ -758,8 +758,8 @@ class SafetyLayer(CommonroadEnv):
             s_r, r = arclength_parametrize(right)
             s_new = np.arange(0, s_c[-1], ds)
             def interp_curve(s_old, curve):
-                fx = interp1d(s_old, curve[:, 0], kind="linear", fill_value="extrapolate")
-                fy = interp1d(s_old, curve[:, 1], kind="linear", fill_value="extrapolate")
+                fx = interp1d(s_old, curve[:, 0], kind="cubic", fill_value="extrapolate")
+                fy = interp1d(s_old, curve[:, 1], kind="cubic", fill_value="extrapolate")
                 return np.column_stack((fx(s_new), fy(s_new)))
             center_new = interp_curve(s_c, c)
             left_new = interp_curve(s_l, l)
@@ -785,23 +785,13 @@ class SafetyLayer(CommonroadEnv):
             center_dense = np.delete(center_dense, to_remove, axis=0)
             right_dense = np.delete(right_dense, to_remove, axis=0)
             left_dense = np.delete(left_dense, to_remove, axis=0)
-            if type(center_dense) is not np.ndarray:
-                print("Center dense is not a numpy array")
-                print(l.center_vertices)
-                print(l.left_vertices)
-                print(l.right_vertices)
-                print(to_remove)
             self.dense_lanes[l.lanelet_id] = (left_dense, center_dense, right_dense)
             left = np.array(left)
             right = np.array(right)
             s_centers = np.array([])
             for x, y in center_dense:
-                try:
-                    s, d = ct.convert_to_curvilinear_coords(x, y)
-                    s_centers = np.append(s_centers, s)
-                except CartesianProjectionDomainError:
-                    print("error in converting")
-                    pass
+                s, d = ct.convert_to_curvilinear_coords(x, y)
+                s_centers = np.append(s_centers, s)
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, s_centers, left, right)
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
