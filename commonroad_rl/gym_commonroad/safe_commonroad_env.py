@@ -24,7 +24,7 @@ from commonroad_clcs.util import compute_orientation_from_polyline
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
-
+from commonroad.geometry.shape import Rectangle, Circle, Polygon
 def traveled_distance(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
@@ -154,12 +154,12 @@ class SafetyVerifier:
         obs_state = obs.state_at_time(self.time_step)
         shape = obs.occupancy_at_time(self.time_step).shape
         left,center,right = self.dense_lanes[l_id]
-        c_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1], obs_state.orientation,
-                                                      shape.length, shape.width, center)
-        l_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1],
-                                                      obs_state.orientation,shape.length, shape.width, left)
-        r_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1],
-                                                     obs_state.orientation,shape.length, shape.width, right)
+        l = shape.length if isinstance(shape,Rectangle) else shape.radius
+        w = shape.width if isinstance(shape,Rectangle) else shape.radius
+        o = obs_state.orientation if isinstance(shape,Rectangle) else 0.0
+        c_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1], o, l, w, center)
+        l_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1], o, l, w, left)
+        r_pts = self.get_lane_side_obs_intersection(obs_state.position[0], obs_state.position[1], o, l, w, right)
         pts = []
         for k in (c_pts, l_pts, r_pts):
             if k is not None:   pts.extend(k)
