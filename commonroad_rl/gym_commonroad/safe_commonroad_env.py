@@ -813,7 +813,8 @@ class SafetyLayer(CommonroadEnv):
                             is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])))
 
     def check_safety(self,action,action_copy):
-        fall_back_kkd = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,0)
+        if self.l_id == 0: self.l_id = self.observation_collector.ego_lanelet.lanelet_id
+        fall_back_kkd = self.compute_kappa_dot_dot(self.l_id, 0)
         fall_back_jd =  -0.1 if self.observation["v_ego"] > 2 else 0.1
         if self.safety_verifier.safe_action_check(action[0],action[1], action_copy,0,self.l_id,self.nxt_id):
             print("safe action : ", action)
