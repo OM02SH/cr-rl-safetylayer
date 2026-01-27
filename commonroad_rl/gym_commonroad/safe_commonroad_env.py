@@ -24,7 +24,7 @@ from commonroad_clcs.util import compute_orientation_from_polyline
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_rl.gym_commonroad.utils.stanley_controller_piecewise import StanleyController
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
-from commonroad.geometry.shape import Rectangle, Circle, Polygon
+from commonroad.geometry.shape import Rectangle
 def traveled_distance(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
