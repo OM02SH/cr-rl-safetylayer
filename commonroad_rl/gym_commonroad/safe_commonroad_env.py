@@ -109,19 +109,58 @@ class SafetyVerifier:
         self.precomputed_lane_polygons: Dict[int, Tuple[CurvilinearCoordinateSystem,
                     np.ndarray, np.ndarray, np.ndarray]] = precomputed_lane_polygons
         self.time_step = -1
-        self.lane_width = 5
         self.ego_lanelet = None
         self.dense_lanes : Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray]] = dense_lanes
         self.first_lane = first_lane
+        self.succsesors_to_add = []
+        self.succsesors_to_addl = []
+        self.succsesors_to_addr = []
 
     def get_reachable_lanes(self) -> List[Lanelet]:
         lanes = [self.ego_lanelet]
+        self.succsesors_to_add = []
+        self.succsesors_to_addl = []
+        self.succsesors_to_addr = []
+        def add_successors(lane,needed,k):
+            lanes = []
+            for l_id in lane.successor:
+                s = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
+                l,c,r = self.dense_lanes[l_id]
+                succ_len = traveled_distance(c,c[-1])
+                lanes.append(s)
+                if k == 0:  self.succsesors_to_add.append(l_id)
+                elif k == 1: self.succsesors_to_addl.append(l_id)
+                elif k == 2: self.succsesors_to_addr.append(l_id)
+                if succ_len < needed:
+                    lanes.append(add_successors(s, needed - succ_len))
+            return lanes
         for l_id in self.ego_lanelet.successor:
-            lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(l_id))
+            lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
+            _, c, _ = self.dense_lanes[l_id]
+            succ_len = traveled_distance(c,c[-1])
+            if succ_len < self.prop_ego["ego_length"] + 1:
+                lanes.append(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 0))
+            lanes.append(lane)
         if self.ego_lanelet.adj_left_same_direction:
-            lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left))
+            ll = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
+            lanes.append(ll)
+            for l_id in ll.successor:
+                lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
+                _, c, _ = self.dense_lanes[l_id]
+                succ_len = traveled_distance(c, c[-1])
+                if succ_len < self.prop_ego["ego_length"] + 1:
+                    lanes.append(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 1))
+                lanes.append(lane)
         if self.ego_lanelet.adj_right_same_direction:
-            lanes.append(self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right))
+            rl = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right)
+            lanes.append(rl)
+            for l_id in rl.successor:
+                lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
+                _, c, _ = self.dense_lanes[l_id]
+                succ_len = traveled_distance(c, c[-1])
+                if succ_len < self.prop_ego["ego_length"] + 1:
+                    lanes.append(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 2))
+                lanes.append(lane)
         return lanes
 
     @staticmethod
@@ -168,7 +207,8 @@ class SafetyVerifier:
         if start == end:    return [start]
         else:   return [start, end]
 
-    def get_end_collision_free_area(self, lane : Lanelet, center, pt : list[int], preceding_v,depth = 0,max_depth = 3):
+    def get_end_collision_free_area(self, lane : Lanelet, center, pt : list[int], preceding_v,depth = 0,max_depth = 3)\
+            -> (np.ndarray,Lanelet,float,float,float):
         if depth > max_depth:
             return center[pt[1]:], lane, preceding_v, 0.0, 0.0
         successors = lane.successor
@@ -222,8 +262,8 @@ class SafetyVerifier:
                 v = v_i
         return center[pt[1] : len(center)], lane, preceding_v, v , d
 
-    def get_lane_collision_free_areas(self, lane : Lanelet):
-        C = []
+    def get_lane_collision_free_areas(self, lane : Lanelet) -> List[np.ndarray,Lanelet,float,float,float]:
+        C : List[np.ndarray,Lanelet,float,float,float] = []
         center = self.dense_lanes[lane.lanelet_id][1]
         obs = lane.get_obstacles(self.scenario.obstacles, self.time_step)
         if len(obs) == 0:   # empty lane with no vehicle entering or exiting it
@@ -293,10 +333,6 @@ class SafetyVerifier:
         lb,c,rb = self.dense_lanes[l_id]
         valid_road_polygons = []
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
-        if end == len(lb) - 1:
-            for s_id in lane.successor:
-                sl, _, sr = self.dense_lanes[s_id]
-                valid_road_polygons.append(Polygon(sl.tolist() + sr.tolist()[::-1]).buffer(.2))
         if start == 0:
             if l_id == self.first_lane: # sometimes the ego starts from outside the map
                 p = ego_state.position
@@ -306,8 +342,13 @@ class SafetyVerifier:
                 rect = translate(rect, xoff=p[0], yoff=p[1])
                 valid_road_polygons.append(rect)
             for p_id in lane.predecessor:
-                pl, _, pr = self.dense_lanes[p_id]
+                pl, pc, pr = self.dense_lanes[p_id]
                 valid_road_polygons.append(Polygon(pl.tolist() + pr.tolist()[::-1]).buffer(.2))
+                p_len = traveled_distance(pc,pc[-1])
+                if p_len < self.prop_ego["ego_length"]:
+                    for pp_id in self.scenario.lanelet_network.find_lanelet_by_id(p_id).predecessor:
+                        pl, pc, pr = self.dense_lanes[pp_id]
+                        valid_road_polygons.append(Polygon(pl.tolist() + pr.tolist()[::-1]).buffer(.2))
         poly = Polygon(lb + rb[::-1]).buffer(.2)
         valid_road_polygons.append(poly)
         lane_polygon = union_all(valid_road_polygons)
@@ -356,6 +397,37 @@ class SafetyVerifier:
                 if start == end: continue
                 safe_states.append((start,end, v, self.build_safe_area(start,end,l_id,ego_state)))
         return safe_states
+
+    def expand_area_in_succ(self, S):
+        ll_id = None if not self.ego_lanelet.adj_left_same_direction else self.ego_lanelet.adj_left
+        rl_id = None if not self.ego_lanelet.adj_right_same_direction else self.ego_lanelet.adj_right
+        def comulate_polys(lanes):
+            polys = []
+            for k,lane in S:
+                if lane.lanelet_id in lanes:
+                    spolys = []
+                    for s,e,_,p in k:
+                        if s == 0: spolys.append(p)
+                    if not spolys: continue
+                    polys.append(union_all(spolys).buffer(0.2))
+            if not polys: return None
+            return union_all(polys).buffer(0.2)
+        for i in range(len(S)):
+            ko,laneo = S[i]
+            if laneo.lanelet_id == self.ego_lanelet.lanelet_id: polys = comulate_polys(self.succsesors_to_add)
+            elif ll_id and laneo.lanelet_id == ll_id: polys = comulate_polys(self.succsesors_to_addl)
+            elif rl_id and laneo.lanelet_id == rl_id: polys = comulate_polys(self.succsesors_to_addr)
+            else: continue
+            if polys is None: continue
+            nk = []
+            for s,e,v,p in ko:
+                if e >= len(self.dense_lanes[laneo.lanelet_id][1]) - 1:
+                    p = p.buffer(0.2).union(polys)
+                    nk.append((s,e,v,p.buffer(-0.2)))
+                else:
+                    nk.append((s, e, v, p))
+            S[i] = (nk,laneo)
+        return S
 
     def union_safe_set(self, ll: Lanelet, safe_set_list_left : List[Tuple[int,int,float,Polygon]]
                             , rl : Lanelet, safe_set_list_right :List[Tuple[int,int,float,Polygon]]):
@@ -420,6 +492,7 @@ class SafetyVerifier:
         #   For lane change we must have parts where the safe bounds don't exist,
         #   we do this by expanding the bounds into the adj lane when two safe states area are next to each other.
         #   We only do unions to the left side i.e. left lane with ego and ego with right lane.
+        S = self.expand_area_in_succ(S)
         es = []
         for s in S:
             k, lane = s
@@ -548,8 +621,17 @@ class SafetyVerifier:
         rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
         rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
         rect = translate(rect, xoff=p[0], yoff=p[1])
+        hl = L / 2.0
+        hw = W / 2.0
+        c = math.cos(new_vehicle_state.orientation)
+        s = math.sin(new_vehicle_state.orientation)
+        local = [[hl, hw], [-hl, hw], [-hl, -hw], [hl, -hw]]
+        corners = []
+        for k in local:
+            r = [k[0] * c - k[1] * s, k[0] * s + k[1] * c];
+            corners.append(np.array([p[0] + r[0], p[1] + r[1]]))
         try:
-            curr_l = self.scenario.lanelet_network.find_lanelet_by_position(p)
+            curr_l = self.scenario.lanelet_network.find_lanelet_by_position(corners)
             curr_l = [item for sublist in curr_l for item in sublist]
         except:
             curr_l = None
@@ -582,7 +664,6 @@ class SafetyLayer(CommonroadEnv):
         self.past_ids = []
         self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.6 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
-        self.lane_width = 5
         self.last_relative_heading = 0
         self.prop_ego["v_max"] = 45
         self.final_priority = -1
@@ -646,13 +727,16 @@ class SafetyLayer(CommonroadEnv):
         _, center_points, _ = self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id]
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
-        self.observation["distance_to_lane_end"] = np.array([traveled_distance(center_points[::-1],closest_centerpoint)], dtype= object)
+        self.observation["distance_to_lane_end"] = traveled_distance(center_points[::-1],closest_centerpoint)
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
         self.past_ids = []
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
         self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
+        self.l_id = self.observation_collector.ego_lanelet.lanelet_id
+        self.nxt_id = 0
+        self.time_step = 0
         self.time_step = 0
         self.compute_lane_sides_and_conflict()
         self.observation = initial_observation.copy()
