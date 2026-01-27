@@ -295,9 +295,6 @@ class SafetyVerifier:
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
         if end == len(lb) - 1:
             for s_id in lane.successor:
-                s_l = self.scenario.lanelet_network.find_lanelet_by_id(s_id)
-                while
-
                 sl, _, sr = self.dense_lanes[s_id]
                 valid_road_polygons.append(Polygon(sl.tolist() + sr.tolist()[::-1]).buffer(.2))
         if start == 0:
