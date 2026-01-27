@@ -16,7 +16,6 @@ from commonroad.scenario.lanelet import Lanelet
 from commonroad.scenario.scenario import Scenario
 from commonroad.planning.planning_problem import PlanningProblem
 from commonroad.scenario.state import State
-from commonroad_rl.gym_commonroad.action import ContinuousVehicle
 from commonroad_rl.gym_commonroad.constants import PATH_PARAMS
 from commonroad.scenario.obstacle import Obstacle
 from commonroad_clcs.clcs import CurvilinearCoordinateSystem
@@ -749,8 +748,8 @@ class SafetyLayer(CommonroadEnv):
             s_r, r = arclength_parametrize(right)
             s_new = np.arange(0, s_c[-1], ds)
             def interp_curve(s_old, curve):
-                fx = interp1d(s_old, curve[:, 0], kind="quadratic", fill_value="extrapolate")
-                fy = interp1d(s_old, curve[:, 1], kind="quadratic", fill_value="extrapolate")
+                fx = interp1d(s_old, curve[:, 0], kind="linear", fill_value="extrapolate")
+                fy = interp1d(s_old, curve[:, 1], kind="linear", fill_value="extrapolate")
                 return np.column_stack((fx(s_new), fy(s_new)))
             center_new = interp_curve(s_c, c)
             left_new = interp_curve(s_l, l)
