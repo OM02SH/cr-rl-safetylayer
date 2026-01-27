@@ -587,7 +587,6 @@ class SafetyLayer(CommonroadEnv):
         self.final_priority = -1
         self.intersection_lanes : List[Lanelet] = []
         self.conflict_lanes : defaultdict[int, List[Tuple[Lanelet, bool]]] = defaultdict(list)
-        self.stanley_controller = StanleyController(3,1,0.05,0.3, 3.14, 2.9)
         self.pre_intersection_lanes = None
         self.precomputed_lane_polygons : Dict[int, Tuple[CurvilinearCoordinateSystem, np.ndarray, np.ndarray, np.ndarray]] = {}
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
