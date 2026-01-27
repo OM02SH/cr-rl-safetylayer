@@ -588,15 +588,6 @@ class SafetyVerifier:
                     #if l_id == nxt_id == 0:    return True
                     kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
                     if kdd > 0.8 or kdd < -0.8: return False
-                    """if nxt_id != 0 :
-                        if self.l_id and self.l_id == nxt_id:
-                            kappa_dot_dots = np.linspace(kdd - 0.1, 1,7)
-                        elif self.r_id and self.r_id == nxt_id:
-                            kappa_dot_dots = np.linspace(-1, kdd + 0.1, 7)
-                        else:
-                            kappa_dot_dots = np.linspace(kdd - 0.05 , kdd + 0.05, 3)
-                    else:
-                        kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)"""
                     if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
                     #kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
                     #for kdd in kappa_dot_dots:
@@ -758,8 +749,8 @@ class SafetyLayer(CommonroadEnv):
             s_r, r = arclength_parametrize(right)
             s_new = np.arange(0, s_c[-1], ds)
             def interp_curve(s_old, curve):
-                fx = interp1d(s_old, curve[:, 0], kind="cubic", fill_value="extrapolate")
-                fy = interp1d(s_old, curve[:, 1], kind="cubic", fill_value="extrapolate")
+                fx = interp1d(s_old, curve[:, 0], kind="quadratic", fill_value="extrapolate")
+                fy = interp1d(s_old, curve[:, 1], kind="quadratic", fill_value="extrapolate")
                 return np.column_stack((fx(s_new), fy(s_new)))
             center_new = interp_curve(s_c, c)
             left_new = interp_curve(s_l, l)
