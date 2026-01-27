@@ -132,14 +132,14 @@ class SafetyVerifier:
                 elif k == 1: self.succsesors_to_addl.append(l_id)
                 elif k == 2: self.succsesors_to_addr.append(l_id)
                 if succ_len < needed:
-                    lanes.append(add_successors(s, needed - succ_len))
+                    lanes.extend(add_successors(s, needed - succ_len))
             return lanes
         for l_id in self.ego_lanelet.successor:
             lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
             _, c, _ = self.dense_lanes[l_id]
             succ_len = traveled_distance(c,c[-1])
             if succ_len < self.prop_ego["ego_length"] + 1:
-                lanes.append(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 0))
+                lanes.extend(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 0))
             lanes.append(lane)
         if self.ego_lanelet.adj_left_same_direction:
             ll = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
@@ -149,7 +149,7 @@ class SafetyVerifier:
                 _, c, _ = self.dense_lanes[l_id]
                 succ_len = traveled_distance(c, c[-1])
                 if succ_len < self.prop_ego["ego_length"] + 1:
-                    lanes.append(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 1))
+                    lanes.extend(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 1))
                 lanes.append(lane)
         if self.ego_lanelet.adj_right_same_direction:
             rl = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right)
@@ -159,7 +159,7 @@ class SafetyVerifier:
                 _, c, _ = self.dense_lanes[l_id]
                 succ_len = traveled_distance(c, c[-1])
                 if succ_len < self.prop_ego["ego_length"] + 1:
-                    lanes.append(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 2))
+                    lanes.extend(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 2))
                 lanes.append(lane)
         return lanes
 
