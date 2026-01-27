@@ -295,6 +295,9 @@ class SafetyVerifier:
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
         if end == len(lb) - 1:
             for s_id in lane.successor:
+                s_l = self.scenario.lanelet_network.find_lanelet_by_id(s_id)
+                while
+
                 sl, _, sr = self.dense_lanes[s_id]
                 valid_road_polygons.append(Polygon(sl.tolist() + sr.tolist()[::-1]).buffer(.2))
         if start == 0:
@@ -415,6 +418,7 @@ class SafetyVerifier:
             C.extend(self.get_lane_collision_free_areas(lane))
         for c in C:
             cp, l, vi, vj, d = c
+            if len(cp) < 3 : continue
             S.append((self.safeDistanceSetForSection(cp[0][0],cp[0][1],vi,cp[-1][0],cp[-1][1],vj,cp,l.lanelet_id,d,ego_state),l))
         #   For lane change we must have parts where the safe bounds don't exist,
         #   we do this by expanding the bounds into the adj lane when two safe states area are next to each other.
