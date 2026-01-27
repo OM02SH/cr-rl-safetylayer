@@ -796,69 +796,76 @@ class SafetyLayer(CommonroadEnv):
         if self.l_id == 0: self.l_id = self.observation_collector.ego_lanelet.lanelet_id
         fall_back_kkd = self.compute_kappa_dot_dot(self.l_id, 0)
         fall_back_jd =  -0.1 if self.observation["v_ego"] > 2 else 0.1
-        if self.safety_verifier.safe_action_check(action[0],action[1], action_copy,0,self.l_id,self.nxt_id):
-            print("safe action : ", action)
-            reward_for_safe_action = 1
+        if action[0] > 0.8 or action[1] > 0.8 or action[0] < -0.8 or action[1] < -0.8:
+            reward_for_safe_action = 0
+            print("unsafe action : ", action)
+            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fall_back_kkd,self.l_id,self.nxt_id,0,1)
+            if a == -2: a = fall_back_jd
+            action = np.array([a,fall_back_kkd])
         else:
-            a =  self.safety_verifier.find_feisable_jerk_dot(self.ego_action,action[1],self.l_id,self.nxt_id,0,1)
-            if a != -2:
-                action[0] = a
-                reward_for_safe_action = 0.5
-                print("half safe action : ", action)
+            if self.safety_verifier.safe_action_check(action[0],action[1], action_copy,0,self.l_id,self.nxt_id):
+                print("safe action : ", action)
+                reward_for_safe_action = 1
             else:
-                reward_for_safe_action = 0
-                print("unsafe action : ", action)
-                actions : np.ndarray = self.observation["safe_actions"]
-                if np.all(actions == 0):
-                    action = np.array([fall_back_jd,fall_back_kkd])
-                    print("no safe action", action)
+                a =  self.safety_verifier.find_feisable_jerk_dot(self.ego_action,action[1],self.l_id,self.nxt_id,0,1)
+                if a != -2:
+                    action[0] = a
+                    reward_for_safe_action = 0.5
+                    print("half safe action : ", action)
                 else:
-                    if self.type == 1:
-                        a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[3],self.l_id,self.nxt_id,0,1)
-                        if a != -2: action = np.array([a,actions[3]])
-                        else :
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[0],self.l_id,self.nxt_id,0,1)
-                            if a != -2: action = np.array([a,actions[0]])
-                            else:
-                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[6], self.l_id, self.nxt_id,0,1)
-                                if a != -2: action = np.array([a, actions[6]])
-                                else:
-                                    a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, 0, self.l_id, self.nxt_id,0,1)
-                                    if a != -2: action = np.array([a,0])
-                                    else: action = np.array([fall_back_jd,fall_back_kkd])
-                    elif self.type == 2:
-                        fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
-                        h = fcl_input
-                        a = -2
-                        while a == -2 and fcl_input < 0.8:
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,2)
-                            fcl_input += 0.5
-                        if a == -2: a = fall_back_jd
-                        else:   h = fcl_input
-                        action = np.array([a,h])
-                    elif self.type == 3:
-                        fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
-                        h = fcl_input
-                        a = -2
-                        while a == -2 and fcl_input > -0.8:
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,3)
-                            fcl_input -= 0.5
-                        if a == -2: a = fall_back_jd
-                        else:   h = fcl_input
-                        action = np.array([a,h])
+                    reward_for_safe_action = 0
+                    print("unsafe action : ", action)
+                    actions : np.ndarray = self.observation["safe_actions"]
+                    if np.all(actions == 0):
+                        action = np.array([fall_back_jd,fall_back_kkd])
+                        print("no safe action", action)
                     else:
-                        fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
-                        h = fcl_input
-                        a = -2
-                        for i in range(11):
-                            fcl_input = fcl_input + ((0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1)
-                            if not (-0.8 <= fcl_input <= 0.8):    continue
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,1)
-                            if a != -2: break
-                        if a == -2: a = fall_back_jd
-                        else:   h = fcl_input
-                        action = np.array([a,h])
-                    print("new action ", action)
+                        if self.type == 1:
+                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[3],self.l_id,self.nxt_id,0,1)
+                            if a != -2: action = np.array([a,actions[3]])
+                            else :
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[0],self.l_id,self.nxt_id,0,1)
+                                if a != -2: action = np.array([a,actions[0]])
+                                else:
+                                    a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[6], self.l_id, self.nxt_id,0,1)
+                                    if a != -2: action = np.array([a, actions[6]])
+                                    else:
+                                        a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, 0, self.l_id, self.nxt_id,0,1)
+                                        if a != -2: action = np.array([a,0])
+                                        else: action = np.array([fall_back_jd,fall_back_kkd])
+                        elif self.type == 2:
+                            fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
+                            h = fcl_input
+                            a = -2
+                            while a == -2 and fcl_input < 0.8:
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,2)
+                                fcl_input += 0.5
+                            if a == -2: a = fall_back_jd
+                            else:   h = fcl_input
+                            action = np.array([a,h])
+                        elif self.type == 3:
+                            fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
+                            h = fcl_input
+                            a = -2
+                            while a == -2 and fcl_input > -0.8:
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,3)
+                                fcl_input -= 0.5
+                            if a == -2: a = fall_back_jd
+                            else:   h = fcl_input
+                            action = np.array([a,h])
+                        else:
+                            fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
+                            h = fcl_input
+                            a = -2
+                            for i in range(11):
+                                fcl_input = fcl_input + ((0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1)
+                                if not (-0.8 <= fcl_input <= 0.8):    continue
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0,1)
+                                if a != -2: break
+                            if a == -2: a = fall_back_jd
+                            else:   h = fcl_input
+                            action = np.array([a,h])
+                        print("new action ", action)
             print("current position : ", self.ego_action.vehicle.state.position)
         return reward_for_safe_action, action
 
