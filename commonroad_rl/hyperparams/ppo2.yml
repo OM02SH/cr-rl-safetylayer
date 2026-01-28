@@ -12,7 +12,7 @@ commonroad-v1:
   gamma: 0.99
   # noptepochs: 10
   n_epochs: 10
-  ent_coef: 0.02
+  ent_coef: 0.001
   learning_rate: !!float 3e-4
   # cliprange: 0.2
   clip_range: 0.2
