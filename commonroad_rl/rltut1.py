@@ -111,13 +111,13 @@ save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
 eval_callback = EvalCallback(testing_env,
                              log_path=log_path,
                              eval_freq=500,
-                             n_eval_episodes=3,
+                             n_eval_episodes=15,
                              callback_on_new_best=save_vec_normalize_callback,
                              verbose=1)
 from stable_baselines3 import PPO
 model = PPO(env=training_env, **hyperparams)
 model.learn(
-    total_timesteps=10000,
+    total_timesteps=100000,
     callback=eval_callback
 )
 
