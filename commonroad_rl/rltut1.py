@@ -7,7 +7,7 @@ env_configs = {}
 with open("gym_commonroad/configs.yaml","r") as config_file:
     env_configs = yaml.safe_load(config_file)["env_configs"]
 env_configs["reward_type"] = "hybrid_reward"
-log_path = "tutorials/logs/"
+log_path = "tutorials/logs/safe/"
 os.makedirs(log_path, exist_ok=True)
 with open(os.path.join(log_path, "environment_configurations.yml"), "w") as config_file:
     yaml.dump(env_configs, config_file)
@@ -117,7 +117,7 @@ eval_callback = EvalCallback(testing_env,
 from stable_baselines3 import PPO
 model = PPO(env=training_env, **hyperparams)
 model.learn(
-    total_timesteps=10_000_000,
+    total_timesteps=1_000_000,
     callback=eval_callback
 )
 
