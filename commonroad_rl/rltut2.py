@@ -23,11 +23,16 @@ if "normalize" in hyperparams:
     del hyperparams["normalize"]
 
 import gymnasium as gym
-gym.envs.registration.register(
-    id="commonroad-v1-safe",
-    entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
-)
+#gym.envs.registration.register(
+#    id="commonroad-v1-safe",
+#    entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
+#)
 
+gym.envs.registration.register(
+    id="commonroad-v1",
+    entry_point="commonroad_rl.gym_commonroad.commonroad_env:CommonroadEnv",
+    kwargs=None,
+)
 
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
@@ -36,7 +41,7 @@ from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 # Create a Gym-based RL environment with specified data paths and environment configurations
 meta_scenario_path = "tutorials/data/inD-dataset-v1.1/pickles/meta_scenario"
 training_data_path = "tutorials/data/inD-dataset-v1.1/pickles/problem_train"
-training_env = gym.make("commonroad-v1-safe",
+training_env = gym.make("commonroad-v1",
                         meta_scenario_path=meta_scenario_path,
                         train_reset_config_path=training_data_path,
                         **env_configs)
@@ -62,7 +67,7 @@ env_configs_test["test_env"] = True
 
 # Create the testing environment
 testing_data_path = "tutorials/data/inD-dataset-v1.1/pickles/problem_test"
-testing_env = gym.make("commonroad-v1-safe",
+testing_env = gym.make("commonroad-v1",
                        meta_scenario_path=meta_scenario_path,
                        test_reset_config_path=testing_data_path,
                        **env_configs_test)
@@ -107,7 +112,7 @@ save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
 eval_callback = EvalCallback(testing_env,
                              log_path=log_path,
                              eval_freq=500,
-                             n_eval_episodes=3,
+                             n_eval_episodes=15,
                              callback_on_new_best=save_vec_normalize_callback)
 
 from stable_baselines3.common.vec_env import VecNormalize
@@ -120,8 +125,10 @@ training_env = VecNormalize.load("tutorials/logs/vecnormalize.pkl", training_env
 model_continual = PPO.load("tutorials/logs/intermediate_model", env=training_env, **hyperparams)
 
 # Set learning steps and trigger learning with the evaluation callback
-n_timesteps=5000
-model_continual.learn(n_timesteps, eval_callback)
+model_continual.learn(
+    total_timesteps=100000,
+    callback=eval_callback
+)
 
 # Save the continual-learning model
 # Note that we use the name "best_model" here as it will be fetched in the next tutorials
