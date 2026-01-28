@@ -4,16 +4,16 @@ commonroad-v1:
   # n_timesteps: !!float 1e4
   policy: 'MlpPolicy' # 'MlpPolicy' 'MlpLstmPolicy'
 #  policy_kwargs: "dict(n_lstm=8)"
-  n_steps: 1024 # 2048
+  n_steps: 2048 # 2048
   # nminibatches: 1 #32
-  batch_size: 2
+  batch_size: 256
   # lam: 0.95
   gae_lambda: 0.95
   gamma: 0.99
   # noptepochs: 10
   n_epochs: 10
-  ent_coef: 0.0
-  learning_rate: !!float 5e-4
+  ent_coef: 0.02
+  learning_rate: !!float 3e-4
   # cliprange: 0.2
   clip_range: 0.2
 
