@@ -87,8 +87,12 @@ def make_testing_env():
 testing_env = DummyVecEnv([make_testing_env])
 
 # Normalize only observations during testing
-testing_env = VecNormalize(testing_env, norm_obs=True, norm_reward=False, training=False)
-
+testing_env = VecNormalize.load(
+    "tutorials/logs/vecnormalize.pkl",
+    testing_env
+)
+testing_env.training = False
+testing_env.norm_reward = False
 
 # Define a customized callback function to save the vectorized and normalized training environment
 class SaveVecNormalizeCallback(BaseCallback):
@@ -104,29 +108,35 @@ class SaveVecNormalizeCallback(BaseCallback):
         save_path_name = os.path.join(self.save_path, "vecnormalize.pkl")
         self.model.get_vec_normalize_env().save(save_path_name)
         print("Saved vectorized and normalized environment to {}".format(save_path_name))
+        return True
 
 
 # Pass the testing environment and customized saving callback to an evaluation callback
 # Note that the evaluation callback will triggers three evaluating episodes after every 500 training steps
 save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
 eval_callback = EvalCallback(testing_env,
-                             log_path=log_path,
-                             eval_freq=500,
-                             n_eval_episodes=15,
-                             callback_on_new_best=save_vec_normalize_callback)
+                best_model_save_path=log_path,
+                log_path=log_path,
+                eval_freq=20_000,
+                n_eval_episodes=25,
+                callback_on_new_best=save_vec_normalize_callback,
+                verbose=1
+)
 
 from stable_baselines3.common.vec_env import VecNormalize
 from stable_baselines3 import PPO
 
 # Load saved environment
 training_env = VecNormalize.load("tutorials/logs/vecnormalize.pkl", training_env)
+training_env.training = True
+training_env.norm_reward = True
 
 # Load pretrained model
-model_continual = PPO.load("tutorials/logs/intermediate_model", env=training_env, **hyperparams)
+model_continual = PPO.load("tutorials/logs/intermediate_model", env=training_env)
 
 # Set learning steps and trigger learning with the evaluation callback
 model_continual.learn(
-    total_timesteps=100000,
+    total_timesteps=10_000_000,
     callback=eval_callback
 )
 
