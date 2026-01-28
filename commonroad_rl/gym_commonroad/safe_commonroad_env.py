@@ -912,6 +912,7 @@ class SafetyLayer(CommonroadEnv):
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         if reward_for_safe_action:
+            reward += 100
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
         else:   reward -= 80
