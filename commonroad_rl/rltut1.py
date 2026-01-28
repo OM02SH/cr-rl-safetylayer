@@ -107,12 +107,15 @@ class SaveVecNormalizeCallback(BaseCallback):
         # return True
 
 save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
-eval_callback = EvalCallback(testing_env,
-                             log_path=log_path,
-                             eval_freq=20_000,
-                             n_eval_episodes=25,
-                             callback_on_new_best=save_vec_normalize_callback,
-                             verbose=1)
+eval_callback = EvalCallback(
+    testing_env,
+    best_model_save_path=log_path,   # separate folder
+    log_path=log_path,
+    eval_freq=20_000,
+    n_eval_episodes=25,
+    callback_on_new_best=save_vec_normalize_callback,
+    verbose=1
+)
 from stable_baselines3 import PPO
 model = PPO(env=training_env, **hyperparams)
 model.learn(
