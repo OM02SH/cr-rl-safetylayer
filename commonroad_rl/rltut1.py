@@ -104,7 +104,7 @@ class SaveVecNormalizeCallback(BaseCallback):
         self.model.get_vec_normalize_env().save(save_path_name)
         print("Saved vectorized and normalized environment to {}".format(save_path_name))
         # # Return True added to always continue training
-        # return True
+        return True
 
 save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
 eval_callback = EvalCallback(
@@ -123,5 +123,5 @@ model.learn(
     callback=eval_callback
 )
 
-model.save("tutorials/logs/intermediate_model")
+model.save(log_path + "intermediate_model")
 
