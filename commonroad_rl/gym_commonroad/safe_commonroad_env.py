@@ -611,7 +611,7 @@ class SafetyVerifier:
         return False"""
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
-        if q == 2:            return True
+        if q == 2:  return True
         q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
@@ -644,9 +644,6 @@ class SafetyVerifier:
                     kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
                     if kdd > 0.8 or kdd < -0.8: return False
                     if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
-                    #kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
-                    #for kdd in kappa_dot_dots:
-                    #    if self.check_feisable_jerk_dot(ego_action,kdd,l_id,nxt_id,q):   return True
         return False
 
 class SafetyLayer(CommonroadEnv):
@@ -921,6 +918,7 @@ class SafetyLayer(CommonroadEnv):
         self.in_or_entering_intersection = self.intersection_check()
         if self.time_step % 5 == 0:
             self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
+        else: self.safety_verifier.time_step += 1
         observation_vector = self.apply_safety(observation, terminated)
         return observation_vector, reward, terminated, truncated, info
 
