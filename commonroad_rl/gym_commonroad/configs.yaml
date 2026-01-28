@@ -158,10 +158,10 @@ env_configs:
   reward_configs:
     hybrid_reward:
       # Termination related
-      reward_goal_reached: 2000.
-      reward_collision: -1000.
-      reward_off_road: -1000.
-      reward_time_out: -200.
+      reward_goal_reached: 300.
+      reward_collision: -150.
+      reward_off_road: -150.
+      reward_time_out: -40.
       reward_friction_violation: 0.0 # -10.
       # reward for termininating close to goal
       reward_long_distance_reference_path: 2.0
