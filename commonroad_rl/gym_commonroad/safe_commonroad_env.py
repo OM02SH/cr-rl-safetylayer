@@ -621,14 +621,13 @@ class SafetyVerifier:
         rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
         rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
         rect = translate(rect, xoff=p[0], yoff=p[1])
-        hl = L / 2.0
-        hw = W / 2.0
+        hl, hw = L / 2.0, W / 2.0
         c = math.cos(new_vehicle_state.orientation)
         s = math.sin(new_vehicle_state.orientation)
         local = [[hl, hw], [-hl, hw], [-hl, -hw], [hl, -hw]]
         corners = []
         for k in local:
-            r = [k[0] * c - k[1] * s, k[0] * s + k[1] * c];
+            r = [k[0] * c - k[1] * s, k[0] * s + k[1] * c]
             corners.append(np.array([p[0] + r[0], p[1] + r[1]]))
         try:
             curr_l = self.scenario.lanelet_network.find_lanelet_by_position(corners)
@@ -920,7 +919,8 @@ class SafetyLayer(CommonroadEnv):
         self.get_distance_to_lane_end()
         self.time_step += 1
         self.in_or_entering_intersection = self.intersection_check()
-        self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
+        if self.time_step % 5 == 0:
+            self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
         observation_vector = self.apply_safety(observation, terminated)
         return observation_vector, reward, terminated, truncated, info
 
