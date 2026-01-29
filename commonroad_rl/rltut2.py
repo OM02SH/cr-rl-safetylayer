@@ -2,7 +2,7 @@ import os
 import yaml
 import copy
 
-log_path = "tutorials/logs/"
+log_path = "tutorials/logs/safe"
 
 # Read in environment configurations
 env_configs = {}
@@ -23,16 +23,16 @@ if "normalize" in hyperparams:
     del hyperparams["normalize"]
 
 import gymnasium as gym
-#gym.envs.registration.register(
-#    id="commonroad-v1-safe",
-#    entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
-#)
-
 gym.envs.registration.register(
-    id="commonroad-v1",
-    entry_point="commonroad_rl.gym_commonroad.commonroad_env:CommonroadEnv",
-    kwargs=None,
+    id="commonroad-v1-safe",
+    entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
 )
+
+#gym.envs.registration.register(
+#    id="commonroad-v1",
+#    entry_point="commonroad_rl.gym_commonroad.commonroad_env:CommonroadEnv",
+#    kwargs=None,
+#)
 
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
@@ -41,7 +41,7 @@ from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 # Create a Gym-based RL environment with specified data paths and environment configurations
 meta_scenario_path = "tutorials/data/inD-dataset-v1.1/pickles/meta_scenario"
 training_data_path = "tutorials/data/inD-dataset-v1.1/pickles/problem_train"
-training_env = gym.make("commonroad-v1",
+training_env = gym.make("commonroad-v1-safe",
                         meta_scenario_path=meta_scenario_path,
                         train_reset_config_path=training_data_path,
                         **env_configs)
@@ -67,13 +67,13 @@ env_configs_test["test_env"] = True
 
 # Create the testing environment
 testing_data_path = "tutorials/data/inD-dataset-v1.1/pickles/problem_test"
-testing_env = gym.make("commonroad-v1",
+testing_env = gym.make("commonroad-v1-safe",
                        meta_scenario_path=meta_scenario_path,
                        test_reset_config_path=testing_data_path,
                        **env_configs_test)
 
 # Wrap the environment with a monitor to keep an record of the testing episodes
-log_path_test = "tutorials/logs/test"
+log_path_test = "tutorials/logs/safe/test"
 os.makedirs(log_path_test, exist_ok=True)
 
 testing_env = Monitor(testing_env, log_path_test + "/0", info_keywords=info_keywords)
@@ -88,7 +88,7 @@ testing_env = DummyVecEnv([make_testing_env])
 
 # Normalize only observations during testing
 testing_env = VecNormalize.load(
-    "tutorials/logs/vecnormalize.pkl",
+    "tutorials/logs/safe/vecnormalize.pkl",
     testing_env
 )
 testing_env.training = False
@@ -117,8 +117,8 @@ save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
 eval_callback = EvalCallback(testing_env,
                 best_model_save_path=log_path,
                 log_path=log_path,
-                eval_freq=20_000,
-                n_eval_episodes=25,
+                eval_freq=10_000,
+                n_eval_episodes=15,
                 callback_on_new_best=save_vec_normalize_callback,
                 verbose=1
 )
@@ -127,23 +127,23 @@ from stable_baselines3.common.vec_env import VecNormalize
 from stable_baselines3 import PPO
 
 # Load saved environment
-training_env = VecNormalize.load("tutorials/logs/vecnormalize.pkl", training_env)
+training_env = VecNormalize.load("tutorials/logs/safe/vecnormalize.pkl", training_env)
 training_env.training = True
 training_env.norm_reward = True
 
 # Load pretrained model
-model_continual = PPO.load("tutorials/logs/intermediate_model", env=training_env)
+model_continual = PPO.load("tutorials/logs/safe/best_model.zip", env=training_env)
 
 # Set learning steps and trigger learning with the evaluation callback
 model_continual.learn(
-    total_timesteps=10_000_000,
+    total_timesteps=100_000,
     callback=eval_callback
 )
 
 # Save the continual-learning model
 # Note that we use the name "best_model" here as it will be fetched in the next tutorials
-model_continual.save("tutorials/logs/best_model")
-model_continual.get_vec_normalize_env().save("tutorials/logs/vecnormalize.pkl")
+model_continual.save("tutorials/logs/safe/best_model")
+model_continual.get_vec_normalize_env().save("tutorials/logs/safe/vecnormalize.pkl")
 
 
 

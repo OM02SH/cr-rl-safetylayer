@@ -3,8 +3,6 @@ from collections import defaultdict
 import numpy as np
 from typing import List, Tuple, Optional, Union, Dict
 
-from scipy.interpolate import interp1d
-
 from shapely.geometry import Polygon
 from shapely.affinity import rotate, translate
 from shapely import union_all
@@ -22,8 +20,9 @@ from commonroad_clcs.clcs import CurvilinearCoordinateSystem
 from commonroad_clcs.config import CLCSParams
 from commonroad_clcs.util import compute_orientation_from_polyline
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
-from commonroad_clcs.pycrccosy import CartesianProjectionDomainError
+from commonroad_clcs.pycrccosy import CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError
 from commonroad.geometry.shape import Rectangle
+
 def traveled_distance(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
@@ -88,7 +87,7 @@ def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, loo
     elif remain > lookahead:
         try:
             far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
-        except CartesianProjectionDomainError:
+        except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
             far_pos = len(center_points) - 1 
         return center_points[closest_centerpoint:far_pos + 1]
     if nxt_cps is None:
@@ -913,10 +912,11 @@ class SafetyLayer(CommonroadEnv):
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         if reward_for_safe_action:
-            reward += 100
+            reward += 60
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
-        else:   reward -= 80
+        else:
+            reward -= 30
         self.observation = observation
         self.get_distance_to_lane_end()
         self.time_step += 1
