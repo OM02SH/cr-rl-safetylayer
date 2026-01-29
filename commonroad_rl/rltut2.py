@@ -52,7 +52,7 @@ info_keywords = tuple(["is_collision", \
                        "is_off_road", \
                        "is_friction_violation", \
                        "is_goal_reached"])
-training_env = Monitor(training_env, log_path + "0", info_keywords=info_keywords)
+training_env = Monitor(training_env, log_path + "/0", info_keywords=info_keywords)
 
 # Vectorize the environment with a callable argument
 def make_training_env():
