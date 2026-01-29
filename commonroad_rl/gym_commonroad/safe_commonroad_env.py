@@ -86,14 +86,19 @@ def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, loo
         if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
         return center_points[closest_centerpoint:]
     elif remain > lookahead:
-        far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
+        try:
+            far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
+        except CartesianProjectionDomainError:
+            far_pos = len(center_points) - 1 
         return center_points[closest_centerpoint:far_pos + 1]
     if nxt_cps is None:
         if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
         return center_points[closest_centerpoint:]
     lookahead_in_nxt = lookahead - remain
-    if lookahead_in_nxt <0.1 or lookahead_in_nxt>traveled_distance(nxt_cps,nxt_cps[-1]):
-        far_pos = len(center_points)
+    if lookahead_in_nxt <0.1:
+        far_pos = 0
+    elif lookahead_in_nxt >= traveled_distance(nxt_cps,nxt_cps[-1]):
+        far_pos = len(nxt_cps) - 1 
     else:
         far_pos = np.linalg.norm(nxt_cps - np.array(nct.convert_to_cartesian_coords(lookahead_in_nxt, 0)),axis=1).argmin()
     return np.vstack((center_points[closest_centerpoint:], nxt_cps[:far_pos + 1]))
