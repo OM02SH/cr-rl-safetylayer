@@ -119,7 +119,7 @@ eval_callback = EvalCallback(
 from stable_baselines3 import PPO
 model = PPO(env=training_env, **hyperparams)
 model.learn(
-    total_timesteps=100_000,
+    total_timesteps=21_000,
     callback=eval_callback
 )
 
