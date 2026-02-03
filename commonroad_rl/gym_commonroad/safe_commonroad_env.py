@@ -70,6 +70,29 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
     def wrap_to_pi(angle):
         return (angle + np.pi) % (2 * np.pi) - np.pi
     la = max(5.0, v)
+    def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, lookahead, nxt_cps,nct : CurvilinearCoordinateSystem):
+        closest_centerpoint = np.linalg.norm(center_points - pos, axis=1).argmin()
+        remain = traveled_distance(center_points[::-1], center_points[closest_centerpoint])
+        if lookahead - 1e-4 < remain < lookahead + 1e-4:
+            if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
+            return center_points[closest_centerpoint:]
+        elif remain > lookahead:
+            try:
+                far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
+            except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
+                far_pos = len(center_points) - 1
+            return center_points[closest_centerpoint:far_pos + 1]
+        if nxt_cps is None:
+            if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
+            return center_points[closest_centerpoint:]
+        lookahead_in_nxt = lookahead - remain
+        if lookahead_in_nxt <0.1:
+            far_pos = 0
+        elif lookahead_in_nxt >= traveled_distance(nxt_cps,nxt_cps[-1]):
+            far_pos = len(nxt_cps) - 1
+        else:
+            far_pos = np.linalg.norm(nxt_cps - np.array(nct.convert_to_cartesian_coords(lookahead_in_nxt, 0)),axis=1).argmin()
+        return np.vstack((center_points[closest_centerpoint:], nxt_cps[:far_pos + 1]))
     local_center = extract_segment(ct, pos, center_points, s, la, ncp, nct)
     e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
     kappa_ref = kappa(local_center) - (0.8 * d) - (1.5 * e_theta)
@@ -77,30 +100,6 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
     kappa_ref = np.clip(kappa_ref, - kappa_max, kappa_max)
     kappa_ddot = 4.0 * (kappa_ref - kap) - 2.0 * kappa_dot
     return float(np.clip(kappa_ddot / 20.0, -1.0, 1.0))
-
-def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, lookahead, nxt_cps,nct : CurvilinearCoordinateSystem):
-    closest_centerpoint = np.linalg.norm(center_points - pos, axis=1).argmin()
-    remain = traveled_distance(center_points[::-1], center_points[closest_centerpoint])
-    if lookahead - 1e-4 < remain < lookahead + 1e-4:
-        if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
-        return center_points[closest_centerpoint:]
-    elif remain > lookahead:
-        try:
-            far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
-        except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
-            far_pos = len(center_points) - 1 
-        return center_points[closest_centerpoint:far_pos + 1]
-    if nxt_cps is None:
-        if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
-        return center_points[closest_centerpoint:]
-    lookahead_in_nxt = lookahead - remain
-    if lookahead_in_nxt <0.1:
-        far_pos = 0
-    elif lookahead_in_nxt >= traveled_distance(nxt_cps,nxt_cps[-1]):
-        far_pos = len(nxt_cps) - 1 
-    else:
-        far_pos = np.linalg.norm(nxt_cps - np.array(nct.convert_to_cartesian_coords(lookahead_in_nxt, 0)),axis=1).argmin()
-    return np.vstack((center_points[closest_centerpoint:], nxt_cps[:far_pos + 1]))
 
 class SafetyVerifier:
 
@@ -500,7 +499,7 @@ class SafetyVerifier:
         es = []
         for s in S:
             k, lane = s
-            if lane == self.ego_lanelet:
+            if lane.lanelet_id == self.ego_lanelet.lanelet_id:
                 es.extend(k)
         if not in_or_entering_intersection:
             if self.l_id:
@@ -508,7 +507,7 @@ class SafetyVerifier:
                 ls = []
                 for s in S:
                     k, lane = s
-                    if lane.lanelet_id == ll:
+                    if lane.lanelet_id == ll.lanelet_id:
                         ls.extend(k)
                 S.extend(self.union_safe_set(ll,ls,self.ego_lanelet,es))
             if self.ego_lanelet.adj_right_same_direction:
@@ -516,7 +515,7 @@ class SafetyVerifier:
                 rs = []
                 for s in S:
                     k, lane = s
-                    if lane.lanelet_id == rl:
+                    if lane.lanelet_id == rl.lanelet_id:
                         rs.extend(k)
                 S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
         self.safe_set = S
