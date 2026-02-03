@@ -703,9 +703,13 @@ class SafetyLayer(CommonroadEnv):
         scenario_num = int(self.scenario.scenario_id.map_name[3])
         if scenario_num in self.cache:
             (self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes) = self.cache[scenario_num]
+            print("unpack : ", scenario_num)
+            print(self.dense_lanes.keys())
         else:
             self.compute_lane_sides_and_conflict()
             self.cache[scenario_num] = (self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes)
+            print("pack : ", scenario_num)
+            print(self.dense_lanes.keys())
         self.observation = initial_observation.copy()
         self.get_distance_to_lane_end()
         self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons,
@@ -794,9 +798,9 @@ class SafetyLayer(CommonroadEnv):
             self.precomputed_lane_polygons[l.lanelet_id] = (ct, s_centers, left, right)
         for l in self.scenario.lanelet_network.lanelets:
             for k in self.scenario.lanelet_network.lanelets:
-                if l.lanelet_id == k.lanelet_id or (l.predecessor and k.predecessor and l.predecessor == k.predecessor) \
-                    or k.lanelet_id == l.adj_left or k.lanelet_id == l.adj_right :
-                    continue
+                if (l.predecessor and k.predecessor and l.predecessor == k.predecessor) \
+                    or l.lanelet_id == k.lanelet_id or k.lanelet_id == l.adj_left or k.lanelet_id == l.adj_right \
+                    or (l.successor and k.successor and l.successor == k.successor) :   continue
                 if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
                     self.conflict_lanes[l.lanelet_id].append((k,
                             is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])))
