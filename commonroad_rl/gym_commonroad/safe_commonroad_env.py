@@ -700,11 +700,11 @@ class SafetyLayer(CommonroadEnv):
         self.nxt_id = 0
         self.time_step = 0
         self.time_step = 0
-        if int(self.scenario.scenario_id[7]) in self.cache:
-            self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes = self.cache[int(self.scenario.scenario_id[7])]
+        if int(self.scenario.scenario_id.map_id[3]) in self.cache:
+            self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes = self.cache[int(self.scenario.scenario_id.map_id[3])]
         else:
             self.compute_lane_sides_and_conflict()
-            self.cache[int(self.scenario.scenario_id[7])] = self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes
+            self.cache[int(self.scenario.scenario_id.map_id[3])] = self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes
         self.observation = initial_observation.copy()
         self.get_distance_to_lane_end()
         self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons,
