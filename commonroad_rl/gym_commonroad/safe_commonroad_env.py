@@ -63,7 +63,7 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
     """
     try:
         s, d = ct.convert_to_curvilinear_coords(pos[0][0], pos[0][1])
-    except CartesianProjectionDomainError:
+    except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
         ccp = center_points[np.linalg.norm(center_points - pos, axis=1).argmin()]
         s, _ = ct.convert_to_curvilinear_coords(ccp[0], ccp[1])
         d = math.dist(pos[0], ccp)
@@ -322,7 +322,7 @@ class SafetyVerifier:
             pos = (ob.state_at_time(self.time_step + offset).position[0], ob.state_at_time(self.time_step + offset).position[1])
             try:
                 pos_inlane = ct.convert_to_curvilinear_coords(*pos)
-            except CartesianProjectionDomainError:
+            except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
                 cp = ct.reference_path_original()
                 if math.dist(pos,cp[0]) > math.dist(pos,cp[1]):
                     pos_inlane = ct.convert_to_curvilinear_coords(*cp[1])
@@ -439,6 +439,7 @@ class SafetyVerifier:
             returns a List of the two new safe sets
         """
         ct,ls, _, lrp = self.precomputed_lane_polygons[ll.lanelet_id]
+        center_points = self.dense_lanes[ll.lanelet_id][1]
         nls = []
         nrs = []
         for s in safe_set_list_left:
@@ -448,8 +449,14 @@ class SafetyVerifier:
             for c in safe_set_list_right:
                 c1, c2, rv, _ = c
                 _, rcp, rrp = self.dense_lanes[rl.lanelet_id]
-                r_start, _ = ct.convert_to_curvilinear_coords(rcp[c1][0],rcp[c1][1])
-                r_end, _ = ct.convert_to_curvilinear_coords(rcp[c2][0],rcp[c2][1])
+                try:
+                    r_start, _ = ct.convert_to_curvilinear_coords(rcp[c1][0],rcp[c1][1])
+                except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
+                    r_start = ls[np.linalg.norm(center_points - rcp[c1], axis=1).argmin()]
+                try:
+                    r_end, _ = ct.convert_to_curvilinear_coords(rcp[c2][0], rcp[c2][1])
+                except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
+                    r_end = ls[np.linalg.norm(center_points - rcp[c2], axis=1).argmin()]
                 start = max(l_start, r_start)
                 end = min(l_end, r_end)
                 if start < end:
@@ -460,7 +467,7 @@ class SafetyVerifier:
                     rct,_,rlp,_ = self.precomputed_lane_polygons[rl.lanelet_id]
                     frlp = []
                     for p in rlp:
-                        frlp.append(ct.convert_to_cartesian_coords(p[0], p[1] + 4))
+                        frlp.append(rct.convert_to_cartesian_coords(p[0], p[1] + 4))
                     nls.append((start, end, lv, Polygon(llp + flrp[::-1]).buffer(0)))
                     nrs.append((start, end, rv, Polygon(frlp + rrp.tolist()[::-1]).buffer(0)))
         return [(nls,ll), (nrs,rl)]
@@ -779,7 +786,7 @@ class SafetyLayer(CommonroadEnv):
                 try:
                     left.append(np.array(ct.convert_to_curvilinear_coords(left_dense[i][0], left_dense[i][1])))
                     right.append(np.array(ct.convert_to_curvilinear_coords(right_dense[i][0], right_dense[i][1])))
-                except CartesianProjectionDomainError:
+                except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
                     to_remove.append(i)
             center_dense = np.delete(center_dense, to_remove, axis=0)
             right_dense = np.delete(right_dense, to_remove, axis=0)
