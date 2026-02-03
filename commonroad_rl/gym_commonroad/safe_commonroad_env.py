@@ -702,14 +702,11 @@ class SafetyLayer(CommonroadEnv):
         self.time_step = 0
         scenario_num = int(self.scenario.scenario_id.map_name[3])
         if scenario_num in self.cache:
-            (self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes) = self.cache[scenario_num]
-            print("unpack : ", scenario_num)
-            print(self.dense_lanes.keys())
+            (self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes) = copy.deepcopy(self.cache[scenario_num])
         else:
             self.compute_lane_sides_and_conflict()
-            self.cache[scenario_num] = (self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes)
-            print("pack : ", scenario_num)
-            print(self.dense_lanes.keys())
+            self.cache[scenario_num] = (copy.deepcopy(self.precomputed_lane_polygons),
+                copy.deepcopy(self.conflict_lanes), copy.deepcopy(self.dense_lanes))
         self.observation = initial_observation.copy()
         self.get_distance_to_lane_end()
         self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons,
