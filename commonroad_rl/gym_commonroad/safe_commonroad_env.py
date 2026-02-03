@@ -574,46 +574,6 @@ class SafetyVerifier:
                 return True
         return False
 
-    """def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
-        if q == 4:
-            ego_action.step((np.array(jd,kdd)))
-            new_vehicle_state = ego_action.vehicle.state
-            p = new_vehicle_state.position
-            nv = new_vehicle_state.velocity
-            W, L = self.prop_ego["ego_width"], self.prop_ego["ego_length"]
-            rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
-            rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
-            rect = translate(rect, xoff=p[0], yoff=p[1])
-            try:
-                curr_l = self.scenario.lanelet_network.find_lanelet_by_position(p)
-            except:
-                curr_l = None
-            if curr_l is not None:
-                for s in self.safe_set:
-                    k, lane = s
-                    if lane.lanelet_id == curr_l:
-                        for start, end, v, poly in k:
-                            if v - .1 > nv: break
-                            if start == end or not (v - .1 <= nv <= v + .1): continue
-                            if poly.contains(rect): return True
-            else:
-                for l in self.get_reachable_lanes():
-                    for s in self.safe_set:
-                        k, lane = s
-                        if lane.lanelet_id == l.lanelet_id:
-                            for start, end, v, poly in k:
-                                if start == end or not (v - 1 <= nv <= v + 1) : continue
-                                if poly.contains(rect): return True
-            return False
-        q += 1
-        ego_action.step(np.array([jd,kdd]))
-        new_vehicle_state = ego_action.vehicle.state
-        kdd = self.compute_kappa_dot_dot(l_id, nxt_id, new_vehicle_state)
-        kappa_dot_dots = np.linspace(kdd - 0.05, kdd + 0.05, 3)
-        for kdd in kappa_dot_dots:
-            if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):  return True
-        return False"""
-
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         if q == 2:  return True
         q += 1
@@ -682,6 +642,8 @@ class SafetyLayer(CommonroadEnv):
         self.nxt_id = 0
         self.kappa_dds = []
         self.type = 0
+        self.cache : Dict[int, Tuple[Dict[int, Tuple[CurvilinearCoordinateSystem, np.ndarray, np.ndarray, np.ndarray]],
+                    defaultdict[int, List[Tuple[Lanelet, bool]]], Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]]]] = {}
 
     def pack_observation(self, observation_dict):
         def pack_orig():
@@ -738,7 +700,11 @@ class SafetyLayer(CommonroadEnv):
         self.nxt_id = 0
         self.time_step = 0
         self.time_step = 0
-        self.compute_lane_sides_and_conflict()
+        if int(self.scenario.scenario_id[7]) in self.cache:
+            self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes = self.cache[int(self.scenario.scenario_id[7])]
+        else:
+            self.compute_lane_sides_and_conflict()
+            self.cache[int(self.scenario.scenario_id[7])] = self.precomputed_lane_polygons, self.conflict_lanes, self.dense_lanes
         self.observation = initial_observation.copy()
         self.get_distance_to_lane_end()
         self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons,
