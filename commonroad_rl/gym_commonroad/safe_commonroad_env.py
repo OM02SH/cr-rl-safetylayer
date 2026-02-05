@@ -544,7 +544,7 @@ class SafetyVerifier:
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
-        low, high = -0.8, 0.8
+        low, high = -0.6, 0.6
         while high - low > 1e-5:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
@@ -563,7 +563,7 @@ class SafetyVerifier:
         return safe_min, safe_max
 
     def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
-        for i in range(11):
+        for i in range(9):
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
@@ -572,7 +572,7 @@ class SafetyVerifier:
         return -2
 
     def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
-        for i in range(11):
+        for i in range(9):
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
