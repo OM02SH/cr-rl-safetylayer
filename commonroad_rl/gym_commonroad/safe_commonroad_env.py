@@ -813,8 +813,6 @@ class SafetyLayer(CommonroadEnv):
                     relation = is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])
                     if relation == -1:  continue
                     self.conflict_lanes[l.lanelet_id].append((k,relation == 1))
-        print(self.conflict_lanes.keys())
-        print(self.dense_lanes.keys())
 
     def check_safety(self,action,action_copy):
         if self.l_id == 0: self.l_id = self.observation_collector.ego_lanelet.lanelet_id
