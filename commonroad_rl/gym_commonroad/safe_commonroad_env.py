@@ -333,7 +333,9 @@ class SafetyVerifier:
         return list(obs for obs, obs_center in obs_with_center)
 
     def build_safe_area(self,start,end,l_id, ego_state):
-        lb,c,rb = self.dense_lanes[l_id]
+        lb, _, rb = self.dense_lanes[l_id]
+        lb = lb[start:end + 1]
+        rb = rb[start:end + 1]
         valid_road_polygons = []
         lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
         if start == 0:
@@ -552,7 +554,7 @@ class SafetyVerifier:
                 high = mid
             else:   low = mid
         safe_min = high
-        low, high = -0.8, 0.8
+        low, high = -0.6, 0.6
         while high - low > 1e-5:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
@@ -727,7 +729,7 @@ class SafetyLayer(CommonroadEnv):
         """
             Converts all lanes borders to Curvilinear coordinates and compute the relative conflict lanes.
         """
-        def is_right(a: np.ndarray, b: np.ndarray) -> bool:
+        def is_right(a: np.ndarray, b: np.ndarray) -> int:
             def segment_intersection(p1, p2, q1, q2):
                 A = np.array([p2 - p1, q1 - q2]).T
                 b_vec = q1 - p1
@@ -745,9 +747,12 @@ class SafetyLayer(CommonroadEnv):
                         ta /= np.linalg.norm(ta)
                         tb = b[j + 1] - b[j]
                         tb /= np.linalg.norm(tb)
-                        cross = np.float64(ta[0] * tb[1] - ta[1] * tb[0])
-                        return cross < 0  # True if coming from right
-            return False
+                        angle = np.degrees(np.arccos(np.clip(np.dot(ta, tb), -1.0, 1.0)))
+                        if angle < 10:  return -1
+                        cross = ta[0] * tb[1] - ta[1] * tb[0]
+                        if cross < 0:   return 1
+                        else:   return 0
+            return -1
         self.precomputed_lane_polygons.clear()
         self.dense_lanes.clear()
         self.conflict_lanes.clear()
@@ -805,8 +810,11 @@ class SafetyLayer(CommonroadEnv):
                     or l.lanelet_id == k.lanelet_id or k.lanelet_id == l.adj_left or k.lanelet_id == l.adj_right \
                     or (l.successor and k.successor and l.successor == k.successor) :   continue
                 if l.polygon.shapely_object.intersects(k.polygon.shapely_object):
-                    self.conflict_lanes[l.lanelet_id].append((k,
-                            is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])))
+                    relation = is_right(self.dense_lanes[l.lanelet_id][1], self.dense_lanes[k.lanelet_id][1])
+                    if relation == -1:  continue
+                    self.conflict_lanes[l.lanelet_id].append((k,relation == 1))
+        print(self.conflict_lanes.keys())
+        print(self.dense_lanes.keys())
 
     def check_safety(self,action,action_copy):
         if self.l_id == 0: self.l_id = self.observation_collector.ego_lanelet.lanelet_id
@@ -886,11 +894,11 @@ class SafetyLayer(CommonroadEnv):
         if self.observation_collector.ego_lanelet.lanelet_id not in self.past_ids:
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         if reward_for_safe_action:
-            reward += 60
+            reward += 6
             if self.in_or_entering_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
         else:
-            reward -= 30
+            reward -= 3
         self.observation = observation
         self.get_distance_to_lane_end()
         self.time_step += 1
@@ -937,12 +945,12 @@ class SafetyLayer(CommonroadEnv):
                 else:
                     if action[1] < 0.1:
                         slowing_in_conflict_zone = 1
-        return (60  *  reward_for_exiting_conflict_zone +
-                -20  *  penalty_for_slowing_down_in_conflict_zone +
-                -20  *  priority_non_compliance +
-                -50  *  entering_occupied_conflict_zone +
-                -10  *  not_slowing_occupied_conflict_zone +
-                -10  *  slowing_in_conflict_zone)
+        return (5  *  reward_for_exiting_conflict_zone +
+                -2  *  penalty_for_slowing_down_in_conflict_zone +
+                -2  *  priority_non_compliance +
+                -4  *  entering_occupied_conflict_zone +
+                -1  *  not_slowing_occupied_conflict_zone +
+                -1  *  slowing_in_conflict_zone)
 
     def intersection_check(self):
         nearest, farthest = self.observation["ego_distance_intersection"]

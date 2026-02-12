@@ -7,13 +7,13 @@ env_configs = {}
 with open("gym_commonroad/configs.yaml","r") as config_file:
     env_configs = yaml.safe_load(config_file)["env_configs"]
 env_configs["reward_type"] = "hybrid_reward"
-log_path = "tutorials/logs/normal/"
+log_path = "tutorials/logs/safe/new/"
 os.makedirs(log_path, exist_ok=True)
 with open(os.path.join(log_path, "environment_configurations.yml"), "w") as config_file:
     yaml.dump(env_configs, config_file)
 hyperparams = {}
 with open("hyperparams/ppo2.yml","r") as hyperparam_file:
-    hyperparams = yaml.safe_load(hyperparam_file)["commonroad-v1"]
+    hyperparams = yaml.safe_load(hyperparam_file)["commonroad-safe"]
 with open(os.path.join(log_path, "model_hyperparameters.yml"), "w") as hyperparam_file:
     yaml.dump(hyperparams, hyperparam_file)
 if "normalize" in hyperparams:
@@ -23,19 +23,19 @@ import gymnasium as gym
 from stable_baselines3.common.monitor import Monitor
 
 # try:
-gym.envs.registration.register(
-    id="commonroad-v1",
-    entry_point="commonroad_rl.gym_commonroad.commonroad_env:CommonroadEnv"
-)
+#gym.envs.registration.register(
+#    id="commonroad-v1",
+#    entry_point="commonroad_rl.gym_commonroad.commonroad_env:CommonroadEnv"
+#)
 #     print("[gym_commonroad/__init__.py] Registered commonroad-v1")
 # except gym.error.Error:
 #     print("[gym_commonroad/__init__.py] Error occurs while registering commonroad-v1")
 #     pass
 
-#gym.envs.registration.register(
-#    id="commonroad-v1-safe",
-#    entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
-#)
+gym.envs.registration.register(
+    id="commonroad-v1-safe",
+    entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
+)
 
 import gymnasium as gym
 # from stable_baselines.bench import Monitor
@@ -47,7 +47,7 @@ from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
 # Create a Gym-based RL environment with specified data paths and environment configurations
 meta_scenario_path = "tutorials/data/inD-dataset-v1.0/pickles/meta_scenario"
 training_data_path = "tutorials/data/inD-dataset-v1.0/pickles/problem_train"
-training_env = gym.make("commonroad-v1",
+training_env = gym.make("commonroad-v1-safe",
                         meta_scenario_path=meta_scenario_path,
                         train_reset_config_path= training_data_path,
                         **env_configs)
@@ -73,7 +73,7 @@ env_configs_test = copy.deepcopy(env_configs)
 env_configs_test["test_env"] = True
 
 testing_data_path = "tutorials/data/inD-dataset-v1.0/pickles/problem_test"
-testing_env = gym.make("commonroad-v1",
+testing_env = gym.make("commonroad-v1-safe",
                        meta_scenario_path=meta_scenario_path,
                        test_reset_config_path=testing_data_path,
                        **env_configs_test)
@@ -111,15 +111,15 @@ eval_callback = EvalCallback(
     testing_env,
     best_model_save_path=log_path,   # separate folder
     log_path=log_path,
-    eval_freq=10_000,
-    n_eval_episodes=15,
+    eval_freq=5_000,
+    n_eval_episodes=20,
     callback_on_new_best=save_vec_normalize_callback,
     verbose=1
 )
 from stable_baselines3 import PPO
 model = PPO(env=training_env, **hyperparams)
 model.learn(
-    total_timesteps=21_000,
+    total_timesteps=100_000,
     callback=eval_callback
 )
 

@@ -117,8 +117,8 @@ save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
 eval_callback = EvalCallback(testing_env,
                 best_model_save_path=log_path,
                 log_path=log_path,
-                eval_freq=10_000,
-                n_eval_episodes=15,
+                eval_freq=5_000,
+                n_eval_episodes=20,
                 callback_on_new_best=save_vec_normalize_callback,
                 verbose=1
 )

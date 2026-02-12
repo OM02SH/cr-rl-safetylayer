@@ -17,6 +17,18 @@ commonroad-v1:
   # cliprange: 0.2
   clip_range: 0.2
 
+commonroad-safe:
+  normalize: true
+  policy: 'MlpPolicy' # 'MlpPolicy' 'MlpLstmPolicy'
+  n_steps: 2048
+  batch_size: 256
+  n_epochs: 5
+  learning_rate: 1e-4
+  clip_range: 0.1
+  ent_coef: 0.0
+  gamma: 0.99
+  gae_lambda: 0.95
+
 commonroad-falsification-v0:
   normalize: true
   # n_envs: 8
