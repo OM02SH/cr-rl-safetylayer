@@ -399,7 +399,7 @@ class SafetyVerifier:
             if s_min_final < s_max_final:
                 start = np.argmin(np.abs(s_centers - s_min_final))
                 end = np.argmin(np.abs(s_centers - s_max_final))
-                if start == end: continue
+                if start >= end-3: continue
                 safe_states.append((start,end, v, self.build_safe_area(start,end,l_id,ego_state)))
         return safe_states
 
