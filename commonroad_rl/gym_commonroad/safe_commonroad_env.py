@@ -642,10 +642,10 @@ class SafetyLayer(CommonroadEnv):
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
         self.safety_verifier : SafetyVerifier = None
         self.in_or_entering_intersection = False
-        self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float32),
-                                        np.full(35, -1.0, dtype=np.float32)])
-        self.new_high = np.concatenate([self.observation_collector.observation_space.high.astype(np.float32),
-                                        np.full(35, 1.0, dtype=np.float32)])
+        self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float64),
+                                        np.full(13, -1.0, dtype=np.float64)])
+        self.new_high = np.concatenate([self.observation_collector.observation_space.high.astype(np.float64),
+                                        np.full(13, 1.0, dtype=np.float64)])
         self.l_id = 0
         self.nxt_id = 0
         self.kappa_dds = []
@@ -683,8 +683,8 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        if actions.size > 33:   actions = actions[:33]
-        elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
+        if actions.size > 11:   actions = actions[:11]
+        elif actions.size < 11:   actions = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = self.final_priority
         observation_vector = self.pack_observation(observation)
@@ -838,17 +838,11 @@ class SafetyLayer(CommonroadEnv):
                         action = np.array([fall_back_jd,fall_back_kkd])
                     else:
                         if self.type == 1:
-                            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[3],self.l_id,self.nxt_id,0)
-                            if a != -2: action = np.array([a,actions[3]])
-                            else :
-                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,actions[0],self.l_id,self.nxt_id,0)
-                                if a != -2: action = np.array([a,actions[0]])
-                                else:
-                                    a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[6], self.l_id, self.nxt_id,0)
-                                    if a != -2: action = np.array([a, actions[6]])
-                                    else:
-                                        a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, 0, self.l_id, self.nxt_id,0)
-                                        if a != -2: action = np.array([a,0])
+                            for x in [1,0,2]:
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[x], self.l_id, self.nxt_id, 0)
+                                if a != -2:
+                                    action = np.array([a, actions[x]])
+                                    break
                         elif self.type == 2:
                             fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
                             h = action[1]
@@ -1022,10 +1016,10 @@ class SafetyLayer(CommonroadEnv):
                 self.type = 1
                 kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for kdd in kappa_dot_dots:
-            safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
-            if safe_min <= safe_max:    At_safe_l.extend([kdd, safe_min, safe_max])
-            else: At_safe_l.extend([kdd,0,0])
-            #At_safe_l.extend([kdd])
+            #safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
+            #if safe_min <= safe_max:    At_safe_l.extend([kdd, safe_min, safe_max])
+            #else: At_safe_l.extend([kdd,0,0])
+            At_safe_l.extend([kdd])
         self.l_id, self.nxt_id = l_id, nxt_id
         return np.array(At_safe_l, dtype=object)
 
@@ -1113,10 +1107,10 @@ class SafetyLayer(CommonroadEnv):
             self.type = 1
             kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for kdd in kappa_dot_dots:
-            safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
-            if safe_min <= safe_max:    At_safe_in.extend([kdd, safe_min, safe_max])
-            else:   At_safe_in.extend([kdd , 0, 0])
-            #At_safe_in.extend([kdd])
+            #safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
+            #if safe_min <= safe_max:    At_safe_in.extend([kdd, safe_min, safe_max])
+            #else:   At_safe_in.extend([kdd , 0, 0])
+            At_safe_in.extend([kdd])
         self.l_id, self.nxt_id = l_id, nxt_id
         return np.array(At_safe_in, dtype=object)
 

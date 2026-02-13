@@ -7,7 +7,7 @@ env_configs = {}
 with open("gym_commonroad/configs.yaml","r") as config_file:
     env_configs = yaml.safe_load(config_file)["env_configs"]
 env_configs["reward_type"] = "hybrid_reward"
-log_path = "tutorials/logs/safe/new/"
+log_path = "tutorials/logs/safe/only_kdd/"
 os.makedirs(log_path, exist_ok=True)
 with open(os.path.join(log_path, "environment_configurations.yml"), "w") as config_file:
     yaml.dump(env_configs, config_file)
