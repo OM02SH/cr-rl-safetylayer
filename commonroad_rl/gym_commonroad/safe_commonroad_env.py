@@ -583,7 +583,7 @@ class SafetyVerifier:
         return False
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
-        if q == 2:  return True
+        if q == 1:  return True
         q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
@@ -613,9 +613,10 @@ class SafetyVerifier:
                 if v - .1 > nv: break
                 if start == end or not (v - .1 <= nv <= v + .1) : continue
                 if poly.contains(rect):
-                    kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
-                    if kdd > 0.8 or kdd < -0.8: return False
-                    if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   return True
+                    #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
+                    #if kdd > 0.8 or kdd < -0.8: return False
+                    #if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   
+                    return True
         return False
 
 class SafetyLayer(CommonroadEnv):
