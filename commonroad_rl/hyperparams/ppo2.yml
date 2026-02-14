@@ -23,9 +23,9 @@ commonroad-safe:
   n_steps: 2048
   batch_size: 256
   n_epochs: 5
-  learning_rate: !!float 1e-4
-  clip_range: 0.1
-  ent_coef: 0.0
+  learning_rate: !!float 2e-4
+  clip_range: 0.2
+  ent_coef: 0.0005
   gamma: 0.99
   gae_lambda: 0.95
 
