@@ -382,7 +382,7 @@ class SafetyVerifier:
         v_crit = min(np.sqrt(r_min * a_lat_max),self.prop_ego["v_max"])
         # s >= s_i + Δ_safe(v, i)
         # s <= s_j - Δ_safe(v, j)
-        vs = np.linspace(0, v_crit, 500)
+        vs = np.linspace(0, v_crit, 50)
         safe_states = []
         # a_lon(v) = a_lon_max * sqrt( 1 - (v^2 / v_crit^2)^2 )
         def a_lon(v, a_lon_max, v_crit ):
@@ -541,11 +541,11 @@ class SafetyVerifier:
                         self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
                         self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
-    def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
-        """
+    """def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
+        ""
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
-        """
+        ""
         low, high = -0.6, 0.6
         while high - low > 1e-5:
             mid = (low + high) / 2
@@ -562,7 +562,7 @@ class SafetyVerifier:
                 low = mid
             else:   high = mid
         safe_max = low
-        return safe_min, safe_max
+        return safe_min, safe_max"""
 
     def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
         for i in range(9):
@@ -573,18 +573,18 @@ class SafetyVerifier:
                 return current_val
         return -2
 
-    def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
+    """def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
         for i in range(9):
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
                 return True
-        return False
+        return False"""
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
-        if q == 1:  return True
-        q += 1
+        #if q == 1:  return True
+        #q += 1
         ego_action.step(np.array([jd,kdd]))
         new_vehicle_state = ego_action.vehicle.state
         p = new_vehicle_state.position
@@ -610,8 +610,14 @@ class SafetyVerifier:
             k, lane = s
             if curr_l is not None and lane.lanelet_id not in curr_l: continue
             for start, end, v, poly in k:
-                if v - .1 > nv: break
-                if start == end or not (v - .1 <= nv <= v + .1) : continue
+                if v - 1 > nv: break
+                if start == end or not (v - .35 <= nv <= v + .35) : continue
+                ct,s,_,_ = self.precomputed_lane_polygons[lane.lanelet_id]
+                try:
+                    ps, _ = ct.convert_to_curvilinear_coords(p[0], p[1])
+                except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
+                    continue
+                if not s[start] <= s <= s[end]: continue
                 if poly.contains(rect):
                     #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
                     #if kdd > 0.8 or kdd < -0.8: return False
@@ -634,7 +640,7 @@ class SafetyLayer(CommonroadEnv):
         self.prop_ego = {"ego_length" : 4.5, "ego_width" : 1.6 , "a_lat_max" : 9.0, "a_lon_max" : 11.5, "delta_react" : 0.5}
         self.time_step = 0
         self.last_relative_heading = 0
-        self.prop_ego["v_max"] = 45
+        self.prop_ego["v_max"] = 34
         self.final_priority = -1
         self.intersection_lanes : List[Lanelet] = []
         self.conflict_lanes : defaultdict[int, List[Tuple[Lanelet, bool]]] = defaultdict(list)
