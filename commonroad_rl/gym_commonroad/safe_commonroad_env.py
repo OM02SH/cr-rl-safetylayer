@@ -541,11 +541,11 @@ class SafetyVerifier:
                         self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
                         self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
-    """def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
-        ""
+    def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
+        """
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
-        ""
+        """
         low, high = -0.6, 0.6
         while high - low > 1e-5:
             mid = (low + high) / 2
@@ -562,7 +562,7 @@ class SafetyVerifier:
                 low = mid
             else:   high = mid
         safe_max = low
-        return safe_min, safe_max"""
+        return safe_min, safe_max
 
     def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
         for i in range(9):
@@ -573,14 +573,14 @@ class SafetyVerifier:
                 return current_val
         return -2
 
-    """def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
+    def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
         for i in range(9):
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
             if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
                 return True
-        return False"""
+        return False
 
     def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
         #if q == 1:  return True
@@ -619,9 +619,9 @@ class SafetyVerifier:
                     continue
                 if not s[int(start)] <= ps <= s[int(end)]: continue
                 if poly.contains(rect):
-                    #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
-                    #if kdd > 0.8 or kdd < -0.8: return False
-                    #if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   
+                    kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
+                    if kdd > 0.8 or kdd < -0.8: return False
+                    if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   
                     return True
         return False
 
@@ -650,9 +650,9 @@ class SafetyLayer(CommonroadEnv):
         self.safety_verifier : SafetyVerifier = None
         self.in_or_entering_intersection = False
         self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float64),
-                                        np.full(13, -1.0, dtype=np.float64)])
+                                        np.full(35, -1.0, dtype=np.float64)])
         self.new_high = np.concatenate([self.observation_collector.observation_space.high.astype(np.float64),
-                                        np.full(13, 1.0, dtype=np.float64)])
+                                        np.full(35, 1.0, dtype=np.float64)])
         self.l_id = 0
         self.nxt_id = 0
         self.kappa_dds = []
@@ -690,8 +690,8 @@ class SafetyLayer(CommonroadEnv):
             self.pre_intersection_lanes = None
             self.final_priority = -1
             actions = self.lane_safety()
-        if actions.size > 11:   actions = actions[:11]
-        elif actions.size < 11:   actions = np.pad(actions, (0, 11 - actions.size), mode='constant', constant_values=0)
+        if actions.size > 33:   actions = actions[:33]
+        elif actions.size < 33:   actions = np.pad(actions, (0, 33 - actions.size), mode='constant', constant_values=0)
         self.observation["safe_actions"] = actions
         self.observation["final_priority"] = self.final_priority
         observation_vector = self.pack_observation(observation)
@@ -948,7 +948,7 @@ class SafetyLayer(CommonroadEnv):
                 -2  *  penalty_for_slowing_down_in_conflict_zone +
                 -2  *  priority_non_compliance +
                 -4  *  entering_occupied_conflict_zone +
-                -1  *  not_slowing_occupied_conflict_zone +
+                1  *  not_slowing_occupied_conflict_zone +
                 -1  *  slowing_in_conflict_zone)
 
     def intersection_check(self):
@@ -1023,10 +1023,10 @@ class SafetyLayer(CommonroadEnv):
                 self.type = 1
                 kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
         for kdd in kappa_dot_dots:
-            #safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
-            #if safe_min <= safe_max:    At_safe_l.extend([kdd, safe_min, safe_max])
-            #else: At_safe_l.extend([kdd,0,0])
-            At_safe_l.extend([kdd])
+            safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
+            if safe_min <= safe_max:    At_safe_l.extend([kdd, safe_min, safe_max])
+            else: At_safe_l.extend([kdd,0,0])
+            #At_safe_l.extend([kdd])
         self.l_id, self.nxt_id = l_id, nxt_id
         return np.array(At_safe_l, dtype=object)
 
@@ -1114,10 +1114,10 @@ class SafetyLayer(CommonroadEnv):
             self.type = 1
             kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
         for kdd in kappa_dot_dots:
-            #safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
-            #if safe_min <= safe_max:    At_safe_in.extend([kdd, safe_min, safe_max])
-            #else:   At_safe_in.extend([kdd , 0, 0])
-            At_safe_in.extend([kdd])
+            safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
+            if safe_min <= safe_max:    At_safe_in.extend([kdd, safe_min, safe_max])
+            else:   At_safe_in.extend([kdd , 0, 0])
+            #At_safe_in.extend([kdd])
         self.l_id, self.nxt_id = l_id, nxt_id
         return np.array(At_safe_in, dtype=object)
 
