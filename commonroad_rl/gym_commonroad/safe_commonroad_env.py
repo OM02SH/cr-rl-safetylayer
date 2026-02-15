@@ -617,7 +617,7 @@ class SafetyVerifier:
                     ps, _ = ct.convert_to_curvilinear_coords(p[0], p[1])
                 except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
                     continue
-                if not s[start] <= s <= s[end]: continue
+                if not s[start] <= ps <= s[end]: continue
                 if poly.contains(rect):
                     #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
                     #if kdd > 0.8 or kdd < -0.8: return False
