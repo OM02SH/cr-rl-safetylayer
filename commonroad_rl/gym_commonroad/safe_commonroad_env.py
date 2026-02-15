@@ -397,8 +397,8 @@ class SafetyVerifier:
             s_min_final = max(txi + zeta_succeeding(v,v_i,a_lon_max,v_crit,delta_react), 0)
             s_max_final = txj - zeta_preceding(v,v_j,a_lon_max,v_crit,delta_react)
             if s_min_final < s_max_final:
-                start = np.argmin(np.abs(s_centers - s_min_final))
-                end = np.argmin(np.abs(s_centers - s_max_final))
+                start = int(np.argmin(np.abs(s_centers - s_min_final)))
+                end = int(np.argmin(np.abs(s_centers - s_max_final)))
                 if start >= end-3: continue
                 safe_states.append((start,end, v, self.build_safe_area(start,end,l_id,ego_state)))
         return safe_states
