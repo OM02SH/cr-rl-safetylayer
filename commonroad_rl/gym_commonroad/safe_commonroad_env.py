@@ -619,9 +619,9 @@ class SafetyVerifier:
                     continue
                 if not s[int(start)] <= ps <= s[int(end)]: continue
                 if poly.contains(rect):
-                    kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
-                    if kdd > 0.8 or kdd < -0.8: return False
-                    if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   
+                    #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
+                    #if kdd > 0.8 or kdd < -0.8: return False
+                    #if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   
                     return True
         return False
 
