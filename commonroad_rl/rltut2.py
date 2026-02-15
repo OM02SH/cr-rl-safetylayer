@@ -1,28 +1,28 @@
 import os
 import yaml
 import copy
+import gymnasium as gym
+from stable_baselines3 import PPO
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
+from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 
-log_path = "tutorials/logs/safe"
+log_path = "tutorials/logs/safe/only_kdd"
 
-# Read in environment configurations
 env_configs = {}
 with open(os.path.join(log_path, "environment_configurations.yml"), "r") as config_file:
     env_configs = yaml.safe_load(config_file)
 
-# Read in model hyperparameters
 hyperparams = {}
 with open(os.path.join(log_path, "model_hyperparameters.yml"), "r") as hyperparam_file:
     hyperparams = yaml.safe_load(hyperparam_file)
 
-# Deduce `policy` from the pretrained model
 if "policy" in hyperparams:
     del hyperparams["policy"]
 
-# Remove `normalize` as it will be handled explicitly later
 if "normalize" in hyperparams:
     del hyperparams["normalize"]
 
-import gymnasium as gym
 gym.envs.registration.register(
     id="commonroad-v1-safe",
     entry_point="commonroad_rl.gym_commonroad.safe_commonroad_env:SafetyLayer",
@@ -34,11 +34,6 @@ gym.envs.registration.register(
 #    kwargs=None,
 #)
 
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
-
-# Create a Gym-based RL environment with specified data paths and environment configurations
 meta_scenario_path = "tutorials/data/inD-dataset-v1.1/pickles/meta_scenario"
 training_data_path = "tutorials/data/inD-dataset-v1.1/pickles/problem_train"
 training_env = gym.make("commonroad-v1-safe",
@@ -46,22 +41,16 @@ training_env = gym.make("commonroad-v1-safe",
                         train_reset_config_path=training_data_path,
                         **env_configs)
 
-# Wrap the environment with a monitor to keep an record of the learning process
 info_keywords = tuple(["is_collision", \
                        "is_time_out", \
                        "is_off_road", \
                        "is_friction_violation", \
                        "is_goal_reached"])
-training_env = Monitor(training_env, log_path + "/0", info_keywords=info_keywords)
+training_env = Monitor(training_env, log_path + "/0", info_keywords=info_keywords, override_existing = False)
 
-# Vectorize the environment with a callable argument
 def make_training_env():
     return training_env
-
-
 training_env = DummyVecEnv([make_training_env])
-
-# Append the additional key for the testing environment
 env_configs_test = copy.deepcopy(env_configs)
 env_configs_test["test_env"] = True
 
@@ -72,29 +61,18 @@ testing_env = gym.make("commonroad-v1-safe",
                        test_reset_config_path=testing_data_path,
                        **env_configs_test)
 
-# Wrap the environment with a monitor to keep an record of the testing episodes
-log_path_test = "tutorials/logs/safe/test"
+log_path_test = os.path.join(log_path, "test")
 os.makedirs(log_path_test, exist_ok=True)
+testing_env = Monitor(testing_env, log_path_test + "/0", info_keywords=info_keywords, override_existing = False)
 
-testing_env = Monitor(testing_env, log_path_test + "/0", info_keywords=info_keywords)
-
-
-# Vectorize the environment with a callable argument
 def make_testing_env():
     return testing_env
 
-
 testing_env = DummyVecEnv([make_testing_env])
-
-# Normalize only observations during testing
-testing_env = VecNormalize.load(
-    "tutorials/logs/safe/vecnormalize.pkl",
-    testing_env
-)
+testing_env = VecNormalize.load(os.path.join(log_path, "vecnormalize.pkl"),testing_env)
 testing_env.training = False
 testing_env.norm_reward = False
 
-# Define a customized callback function to save the vectorized and normalized training environment
 class SaveVecNormalizeCallback(BaseCallback):
     def __init__(self, save_path: str, verbose=1):
         super(SaveVecNormalizeCallback, self).__init__(verbose)
@@ -110,9 +88,6 @@ class SaveVecNormalizeCallback(BaseCallback):
         print("Saved vectorized and normalized environment to {}".format(save_path_name))
         return True
 
-
-# Pass the testing environment and customized saving callback to an evaluation callback
-# Note that the evaluation callback will triggers three evaluating episodes after every 500 training steps
 save_vec_normalize_callback = SaveVecNormalizeCallback(save_path=log_path)
 eval_callback = EvalCallback(testing_env,
                 best_model_save_path=log_path,
@@ -123,28 +98,12 @@ eval_callback = EvalCallback(testing_env,
                 verbose=1
 )
 
-from stable_baselines3.common.vec_env import VecNormalize
-from stable_baselines3 import PPO
-
-# Load saved environment
-training_env = VecNormalize.load("tutorials/logs/safe/vecnormalize.pkl", training_env)
+training_env = VecNormalize.load(os.path.join(log_path, "vecnormalize.pkl"),training_env)
 training_env.training = True
 training_env.norm_reward = True
 
-# Load pretrained model
-model_continual = PPO.load("tutorials/logs/safe/best_model.zip", env=training_env)
+model_continual = PPO.load(os.path.join(log_path, "best_model.zip"),env=training_env)
+model_continual.learn(total_timesteps=100_000,callback=eval_callback)
 
-# Set learning steps and trigger learning with the evaluation callback
-model_continual.learn(
-    total_timesteps=100_000,
-    callback=eval_callback
-)
-
-# Save the continual-learning model
-# Note that we use the name "best_model" here as it will be fetched in the next tutorials
-model_continual.save("tutorials/logs/safe/best_model")
-model_continual.get_vec_normalize_env().save("tutorials/logs/safe/vecnormalize.pkl")
-
-
-
-
+model_continual.save(os.path.join(log_path, "best_model"))
+model_continual.get_vec_normalize_env().save(os.path.join(log_path, "vecnormalize.pkl"))
