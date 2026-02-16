@@ -576,7 +576,6 @@ class SafetyVerifier:
     def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
         for i in range(9):
             current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
-            if not (-0.8 <= current_val <= 0.8):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
             if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
                 return True
@@ -589,6 +588,7 @@ class SafetyVerifier:
         new_vehicle_state = ego_action.vehicle.state
         p = new_vehicle_state.position
         nv = new_vehicle_state.velocity
+        if nv < 0 or nv > 40:   return False
         W, L = self.prop_ego["ego_width"], self.prop_ego["ego_length"]
         rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
         rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
@@ -619,8 +619,8 @@ class SafetyVerifier:
                     continue
                 if not s[int(start)] <= ps <= s[int(end)]: continue
                 if poly.contains(rect):
-                    #kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
-                    #if kdd > 0.8 or kdd < -0.8: return False
+                    kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
+                    if kdd > 0.7 or kdd < -0.7: return False
                     #if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   
                     return True
         return False
@@ -825,7 +825,7 @@ class SafetyLayer(CommonroadEnv):
         if self.l_id == 0: self.l_id = self.observation_collector.ego_lanelet.lanelet_id
         fall_back_kkd = self.compute_kappa_dot_dot(self.l_id, 0)
         fall_back_jd =  -0.1 if self.observation["v_ego"] > 2 else 0.1
-        if action[0] > 0.8 or action[1] > 0.8 or action[0] < -0.8 or action[1] < -0.8:
+        if action[0] > 0.7 or action[1] > 0.7 or action[0] < -0.7 or action[1] < -0.7:
             reward_for_safe_action = 0
             a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fall_back_kkd,self.l_id,self.nxt_id,0)
             if a == -2: a = fall_back_jd
@@ -904,9 +904,9 @@ class SafetyLayer(CommonroadEnv):
         self.in_or_entering_intersection = self.intersection_check()
         if terminated and self.time_step <= 2:
             if self.observation["is_off_road"][0] == True: 
-                reward+=150
+                reward+=1000
             elif self.observation["is_goal_reached"][0] == True:
-                reward-=300
+                reward-=2000
         if self.time_step % 5 == 0:
             self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
         else: self.safety_verifier.time_step += 1

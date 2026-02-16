@@ -7,7 +7,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 
-log_path = "tutorials/logs/safe/only_kdd"
+log_path = "tutorials/logs/safe/final/"
 
 env_configs = {}
 with open(os.path.join(log_path, "environment_configurations.yml"), "r") as config_file:
@@ -50,6 +50,7 @@ training_env = Monitor(training_env, log_path + "/0", info_keywords=info_keyword
 
 def make_training_env():
     return training_env
+
 training_env = DummyVecEnv([make_training_env])
 env_configs_test = copy.deepcopy(env_configs)
 env_configs_test["test_env"] = True
@@ -103,7 +104,7 @@ training_env.training = True
 training_env.norm_reward = True
 
 model_continual = PPO.load(os.path.join(log_path, "best_model.zip"),env=training_env)
-model_continual.learn(total_timesteps=100_000,callback=eval_callback)
+model_continual.learn(total_timesteps=500_000,callback=eval_callback)
 
 model_continual.save(os.path.join(log_path, "best_model"))
 model_continual.get_vec_normalize_env().save(os.path.join(log_path, "vecnormalize.pkl"))
