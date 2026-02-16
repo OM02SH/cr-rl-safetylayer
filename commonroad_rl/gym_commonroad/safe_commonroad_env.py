@@ -902,6 +902,11 @@ class SafetyLayer(CommonroadEnv):
         self.get_distance_to_lane_end()
         self.time_step += 1
         self.in_or_entering_intersection = self.intersection_check()
+        if terminated and self.time_step < 2:
+            if self.observation["is_off_road"][0] == True: 
+                reward+=150
+            elif self.observation["goal_reached"][0] == True:
+                reward-=300
         if self.time_step % 5 == 0:
             self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
         else: self.safety_verifier.time_step += 1
