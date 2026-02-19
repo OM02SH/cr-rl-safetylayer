@@ -111,7 +111,7 @@ reward_configs:
     reward_stay_in_road_center: 0.0
     reward_stop_sign_acc: 0.0
     reward_stop_sign_vel: 0.0
-    reward_time_out: -40.0
+    reward_time_out: -20.0
     stop_sign_vel_zero: 0.0
   sparse_reward:
     reward_collision: -50.0
