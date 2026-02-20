@@ -20,7 +20,7 @@ from commonroad_clcs.clcs import CurvilinearCoordinateSystem
 from commonroad_clcs.config import CLCSParams
 from commonroad_clcs.util import compute_orientation_from_polyline
 from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
-from commonroad_clcs.pycrccosy import CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError
+from commonroad_clcs.pycrccosy import CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError, CurvilinearProjectionDomainLateralError
 from commonroad.geometry.shape import Rectangle
 
 # ==============================
@@ -118,7 +118,7 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
         elif remain > lookahead:
             try:
                 far_pos = np.linalg.norm(center_points - np.array(ct.convert_to_cartesian_coords(s+lookahead,0)),axis=1).argmin()
-            except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
+            except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError, CurvilinearProjectionDomainLateralError):
                 far_pos = len(center_points) - 1
             return center_points[closest_centerpoint:far_pos + 1]
         if nxt_cps is None:
