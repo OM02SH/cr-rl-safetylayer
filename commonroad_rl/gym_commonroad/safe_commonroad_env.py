@@ -23,7 +23,46 @@ from commonroad_rl.gym_commonroad.commonroad_env import CommonroadEnv
 from commonroad_clcs.pycrccosy import CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError
 from commonroad.geometry.shape import Rectangle
 
-def traveled_distance(curve: np.ndarray, target):
+# ==============================
+# Global Safety / Control Constants
+# ==============================
+
+# Numerical stability
+EPS = 1e-12
+SMALL_EPS = 1e-5
+
+# Kappa / curvature constraints
+MAX_KAPPA_DOT_DOT = 0.7
+KAPPA_DOT_DOT_SCALE = 20.0
+KAPPA_FEEDBACK_P = 4.0
+KAPPA_FEEDBACK_D = 2.0
+MIN_SEGMENT_LENGTH = 3
+
+# Jerk search bounds
+JERK_DOT_MIN = -0.8
+JERK_DOT_MAX = 0.8
+JERK_BINARY_SEARCH_MIN = -0.6
+JERK_BINARY_SEARCH_MAX = 0.6
+JERK_SEARCH_STEP = 0.05
+JERK_SEARCH_ITERATIONS = 9
+
+# Velocity bounds
+VELOCITY_MIN = 0.0
+VELOCITY_MAX = 40.0
+
+# Safe velocity tolerance
+SAFE_VELOCITY_TOLERANCE = 0.35
+
+# Geometric buffer
+POLYGON_BUFFER = 0.2
+
+# TTC logic
+MAX_SUCCESSOR_DEPTH = 3
+
+# Intersection logic
+BRAKING_DECEL_INTERSECTION = 5.0
+
+def compute_traveled_distance_along_curve(curve: np.ndarray, target):
     """
         Get the distance from the start of the given point along the curve used for
          lane propagation asin to know where the closest object in the next lane is.
@@ -34,7 +73,7 @@ def traveled_distance(curve: np.ndarray, target):
         d += math.hypot(curve[k][0] - curve[k + 1][0], curve[k][1] - curve[k + 1][1])
     return d
 
-def kappa(laneCenterPoints):
+def compute_mean_curvature(laneCenterPoints):
     xs = laneCenterPoints[:, 0]
     ys = laneCenterPoints[:, 1]
     dx = np.gradient(xs)
@@ -44,7 +83,7 @@ def kappa(laneCenterPoints):
     # from https://www.storyofmathematics.com/curvature-formula/
     # Curvature formula k = |x'y'' − y'x''| / (x'^2 + y'^2)^(3/2)
     denom = (dx * dx + dy * dy) ** 1.5
-    denom[denom < 1e-12] = 1e-12
+    denom[denom < EPS] = EPS
     curvature = np.abs(dx * ddy - dy * ddx) / denom
     return float(np.mean(curvature))
 
@@ -72,7 +111,7 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
     la = max(5.0, v)
     def extract_segment(ct : CurvilinearCoordinateSystem, pos, center_points, s, lookahead, nxt_cps,nct : CurvilinearCoordinateSystem):
         closest_centerpoint = np.linalg.norm(center_points - pos, axis=1).argmin()
-        remain = traveled_distance(center_points[::-1], center_points[closest_centerpoint])
+        remain = compute_traveled_distance_along_curve(center_points[::-1], center_points[closest_centerpoint])
         if lookahead - 1e-4 < remain < lookahead + 1e-4:
             if closest_centerpoint == center_points.shape[0] - 1:   closest_centerpoint -= 2
             return center_points[closest_centerpoint:]
@@ -88,24 +127,24 @@ def compute_kappa_dot_dot_helper(theta, pos, v, a_lat_max, kap, kappa_dot,ct, ce
         lookahead_in_nxt = lookahead - remain
         if lookahead_in_nxt <0.1:
             far_pos = 0
-        elif lookahead_in_nxt >= traveled_distance(nxt_cps,nxt_cps[-1]):
+        elif lookahead_in_nxt >= compute_traveled_distance_along_curve(nxt_cps, nxt_cps[-1]):
             far_pos = len(nxt_cps) - 1
         else:
             far_pos = np.linalg.norm(nxt_cps - np.array(nct.convert_to_cartesian_coords(lookahead_in_nxt, 0)),axis=1).argmin()
         return np.vstack((center_points[closest_centerpoint:], nxt_cps[:far_pos + 1]))
     local_center = extract_segment(ct, pos, center_points, s, la, ncp, nct)
     e_theta = wrap_to_pi(theta - float(compute_orientation_from_polyline(local_center).mean()))
-    kappa_ref = kappa(local_center) - (0.8 * d) - (1.5 * e_theta)
+    kappa_ref = compute_mean_curvature(local_center) - (0.8 * d) - (1.5 * e_theta)
     kappa_max = a_lat_max / (v ** 2)
     kappa_ref = np.clip(kappa_ref, - kappa_max, kappa_max)
     kappa_ddot = 4.0 * (kappa_ref - kap) - 2.0 * kappa_dot
-    return float(np.clip(kappa_ddot / 20.0, -1.0, 1.0))
+    return float(np.clip(kappa_ddot / KAPPA_DOT_DOT_SCALE, -1.0, 1.0))
 
 class SafetyVerifier:
 
     def __init__(self, scenario: Scenario, prop_ego, precomputed_lane_polygons, dense_lanes, first_lane):
-        self.l_id = None
-        self.r_id = None
+        self.left_id = None
+        self.right_id = None
         self.scenario = scenario
         self.prop_ego = prop_ego
         self.safe_set : List[Tuple[List[Tuple[int,int,float,Polygon]],Lanelet]] = []
@@ -127,40 +166,40 @@ class SafetyVerifier:
         def add_successors(lane,needed,k):
             lanes = []
             for l_id in lane.successor:
-                s = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
+                succ = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
                 l,c,r = self.dense_lanes[l_id]
-                succ_len = traveled_distance(c,c[-1])
-                lanes.append(s)
+                succ_len = compute_traveled_distance_along_curve(c, c[-1])
+                lanes.append(succ)
                 if k == 0:  self.succsesors_to_add.append(l_id)
                 elif k == 1: self.succsesors_to_addl.append(l_id)
                 elif k == 2: self.succsesors_to_addr.append(l_id)
                 if succ_len < needed:
-                    lanes.extend(add_successors(s, needed - succ_len,0))
+                    lanes.extend(add_successors(succ, needed - succ_len, 0))
             return lanes
         for l_id in self.ego_lanelet.successor:
             lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
             _, c, _ = self.dense_lanes[l_id]
-            succ_len = traveled_distance(c,c[-1])
+            succ_len = compute_traveled_distance_along_curve(c, c[-1])
             if succ_len < self.prop_ego["ego_length"] + 1:
                 lanes.extend(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 0))
             lanes.append(lane)
         if self.ego_lanelet.adj_left_same_direction:
-            ll = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
-            lanes.append(ll)
-            for l_id in ll.successor:
+            left_lane = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
+            lanes.append(left_lane)
+            for l_id in left_lane.successor:
                 lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
                 _, c, _ = self.dense_lanes[l_id]
-                succ_len = traveled_distance(c, c[-1])
+                succ_len = compute_traveled_distance_along_curve(c, c[-1])
                 if succ_len < self.prop_ego["ego_length"] + 1:
                     lanes.extend(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 1))
                 lanes.append(lane)
         if self.ego_lanelet.adj_right_same_direction:
-            rl = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right)
-            lanes.append(rl)
-            for l_id in rl.successor:
+            right_lane = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right)
+            lanes.append(right_lane)
+            for l_id in right_lane.successor:
                 lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
                 _, c, _ = self.dense_lanes[l_id]
-                succ_len = traveled_distance(c, c[-1])
+                succ_len = compute_traveled_distance_along_curve(c, c[-1])
                 if succ_len < self.prop_ego["ego_length"] + 1:
                     lanes.extend(add_successors(lane, self.prop_ego["ego_length"] + 1 - succ_len, 2))
                 lanes.append(lane)
@@ -221,11 +260,11 @@ class SafetyVerifier:
             lso = ls.get_obstacles(self.scenario.obstacles, self.time_step)
             cp = self.dense_lanes[ls.lanelet_id][1]
             if len(lso) == 0:
-                k = kappa(cp)
+                k = compute_mean_curvature(cp)
                 if k == 0:  r_min = math.inf
                 else:   r_min = 1.0 / k
                 v_crit = np.sqrt(r_min * self.prop_ego["a_lat_max"])
-                return min(v_crit,self.prop_ego["v_max"]), traveled_distance(cp, cp[-1]), False
+                return min(v_crit,self.prop_ego["v_max"]), compute_traveled_distance_along_curve(cp, cp[-1]), False
             else:
                 lso = self.sort_obstacles_in_lane(ls.lanelet_id, lso)
                 lobs_state = lso[0].state_at_time(self.time_step)
@@ -234,39 +273,39 @@ class SafetyVerifier:
                     s_centers = self.precomputed_lane_polygons[ls.lanelet_id][1]
                     p = np.asarray(lobs_state.position).reshape(1, 2)
                     closest_centerpoint = np.linalg.norm(cp - p, axis=1).argmin()
-                    s = s_centers[closest_centerpoint]
-                    return lobs_state.velocity, s, True
-                return lobs_state.velocity, traveled_distance(cp,cp[pts[0]]), True
+                    closest_center_in_clcs = s_centers[closest_centerpoint]
+                    return lobs_state.velocity, closest_center_in_clcs, True
+                return lobs_state.velocity, compute_traveled_distance_along_curve(cp, cp[pts[0]]), True
         s_v_d = []
         for successor in successors:
-            v_i, d_i, found = get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successor))
+            succeeding_velocity, d_i, found = get_closest_obstacle_lane_velocity_distance(self.scenario.lanelet_network.find_lanelet_by_id(successor))
             if not found:
                 next_lane = self.scenario.lanelet_network.find_lanelet_by_id(successor)
                 _, _, _, rec_v, rec_d = self.get_end_collision_free_area(
-                    next_lane, self.dense_lanes[successor][1], [0, 0], v_i, depth + 1, max_depth)
+                    next_lane, self.dense_lanes[successor][1], [0, 0], succeeding_velocity, depth + 1, max_depth)
                 total_dist = d_i + rec_d
-                min_v = min(v_i, rec_v)
+                min_v = min(succeeding_velocity, rec_v)
                 s_v_d.append((successor, min_v, total_dist))
             else:
-                s_v_d.append((successor, v_i, d_i))
+                s_v_d.append((successor, succeeding_velocity, d_i))
         min_ttc = math.inf
         closest_car = s_v_d[0][0]
-        for lane_id, v_i, d_i in s_v_d:
-            relative_speed = self.prop_ego["v_max"] - v_i
+        for lane_id, succeeding_velocity, d_i in s_v_d:
+            relative_speed = self.prop_ego["v_max"] - succeeding_velocity
             if relative_speed <= 0: continue
             ttc = d_i / relative_speed
             if ttc < min_ttc:
                 min_ttc = ttc
                 closest_car = lane_id
-        v,d = 0, 0
+        v, distance_to_next_obstacle = 0, 0
         for lane_id, v_i, d_i in s_v_d:
             if lane_id == closest_car:
-                d = d_i
+                distance_to_next_obstacle = d_i
                 v = v_i
-        return center[pt[1] : len(center)], lane, preceding_v, v , d
+        return center[pt[1] : len(center)], lane, preceding_v, v , distance_to_next_obstacle
 
     def get_lane_collision_free_areas(self, lane : Lanelet) -> List[Tuple[np.ndarray,Lanelet,float,float,float]]:
-        C : List[Tuple[np.ndarray,Lanelet,float,float,float]] = []
+        collision_free_sections : List[Tuple[np.ndarray,Lanelet,float,float,float]] = []
         center = self.dense_lanes[lane.lanelet_id][1]
         obs = lane.get_obstacles(self.scenario.obstacles, self.time_step)
         if len(obs) == 0:   # empty lane with no vehicle entering or exiting it
@@ -279,10 +318,10 @@ class SafetyVerifier:
             s_centers = self.precomputed_lane_polygons[lane.lanelet_id][1]
             p = np.asarray(os.position).reshape(1, 2)
             closest_centerpoint = np.linalg.norm(self.dense_lanes[lane.lanelet_id][1] - p, axis=1).argmin()
-            s = s_centers[closest_centerpoint]
+            closest_center_in_clcs = s_centers[closest_centerpoint]
             l = obs[q].obstacle_shape.length if isinstance(obs[q].obstacle_shape, Rectangle) else obs[q].obstacle_shape.radius
-            start = s + l/2
-            end = s - l/2
+            start = closest_center_in_clcs + l/2
+            end = closest_center_in_clcs - l/2
             if start == end: return np.array(np.linalg.norm(s_centers - start).argmin())
             else: return np.array([np.linalg.norm(s_centers - start).argmin(),
                    np.linalg.norm(s_centers - end).argmin()])
@@ -292,28 +331,28 @@ class SafetyVerifier:
             pt = pts[0]
         else:
             cps = center[0 : pts[0] + 1]
-            C.append((cps,lane, 0.0, preceding_v, 0.0)) # add first collision free area
+            collision_free_sections.append((cps,lane, 0.0, preceding_v, 0.0)) # add first collision free area
             pt = pts[1]
         for i in range(len(obs) - 2):
             obs_state = obs[i + 1].state_at_time(self.time_step)
             pts = self.obs_start_end_index(obs[i + 1], lane.lanelet_id)
             if len(pts) == 0:   pts = solve_0_pts(obs_state, i+1)
             cps = center[pt : pts[0] + 1]
-            C.append((cps, lane, preceding_v, obs_state.velocity, 0.0))  # add middle collision free areas
+            collision_free_sections.append((cps, lane, preceding_v, obs_state.velocity, 0.0))  # add middle collision free areas
             if len(pts) == 2:
                 pt = pts[1]
             preceding_v = obs_state.velocity
         if len(pts) == 2 and ((lane.lanelet_id == self.ego_lanelet.lanelet_id) or
-                              (self.l_id is not None and self.l_id == lane.lanelet_id) or
-                              (self.r_id is not None and self.r_id == lane.lanelet_id)):
+                              (self.left_id is not None and self.left_id == lane.lanelet_id) or
+                              (self.right_id is not None and self.right_id == lane.lanelet_id)):
             # add last collision free area only for the ego and adjacent lanes
-            C.append(self.get_end_collision_free_area(lane, center, pts, preceding_v))
-        if len(C) == 0:
-            if traveled_distance(center,center[pts[0]]) < self.prop_ego["ego_length"]:
-                C.append(self.get_end_collision_free_area(lane, center, [0,pts[0]],preceding_v))
+            collision_free_sections.append(self.get_end_collision_free_area(lane, center, pts, preceding_v))
+        if len(collision_free_sections) == 0:
+            if compute_traveled_distance_along_curve(center, center[pts[0]]) < self.prop_ego["ego_length"]:
+                collision_free_sections.append(self.get_end_collision_free_area(lane, center, [0,pts[0]],preceding_v))
             else:
-                C.append((center[0 : pts[0]+1],lane, 0.0, preceding_v, 0.0))
-        return C
+                collision_free_sections.append((center[0 : pts[0]+1],lane, 0.0, preceding_v, 0.0))
+        return collision_free_sections
 
     def sort_obstacles_in_lane(self, l_id : int ,obs : List[Obstacle], offset = 0) -> List[Obstacle]:
         obs_with_center : List[Tuple[Obstacle, float]] = []
@@ -332,14 +371,14 @@ class SafetyVerifier:
         obs_with_center.sort(key=lambda k: k[1])
         return list(obs for obs, obs_center in obs_with_center)
 
-    def build_safe_area(self,start,end,l_id, ego_state):
-        lb, _, rb = self.dense_lanes[l_id]
-        lb = lb[start:end + 1]
-        rb = rb[start:end + 1]
+    def build_safe_area(self,start,end,lane_id, ego_state):
+        lp, _, rp = self.dense_lanes[lane_id]
+        lp = lp[start:end + 1]
+        rp = rp[start:end + 1]
         valid_road_polygons = []
-        lane = self.scenario.lanelet_network.find_lanelet_by_id(l_id)
+        lane = self.scenario.lanelet_network.find_lanelet_by_id(lane_id)
         if start == 0:
-            if l_id == self.first_lane: # sometimes the ego starts from outside the map
+            if lane_id == self.first_lane: # sometimes the ego starts from outside the map
                 p = ego_state.position
                 W, L = self.prop_ego["ego_width"], self.prop_ego["ego_length"]
                 rect = Polygon([(-L / 2, -W), (-L / 2, W), (L / 2, W), (L / 2, -W)]).buffer(.2)
@@ -348,19 +387,28 @@ class SafetyVerifier:
                 valid_road_polygons.append(rect)
             for p_id in lane.predecessor:
                 pl, pc, pr = self.dense_lanes[p_id]
-                valid_road_polygons.append(Polygon(pl.tolist() + pr.tolist()[::-1]).buffer(.2))
-                p_len = traveled_distance(pc,pc[-1])
+                valid_road_polygons.append(Polygon(pl.tolist() + pr.tolist()[::-1]).buffer(POLYGON_BUFFER))
+                p_len = compute_traveled_distance_along_curve(pc, pc[-1])
                 if p_len < self.prop_ego["ego_length"]:
                     for pp_id in self.scenario.lanelet_network.find_lanelet_by_id(p_id).predecessor:
                         pl, pc, pr = self.dense_lanes[pp_id]
-                        valid_road_polygons.append(Polygon(pl.tolist() + pr.tolist()[::-1]).buffer(.2))
-        poly = Polygon(lb + rb[::-1]).buffer(.2)
+                        valid_road_polygons.append(Polygon(pl.tolist() + pr.tolist()[::-1]).buffer(POLYGON_BUFFER))
+        poly = Polygon(lp + rp[::-1]).buffer(POLYGON_BUFFER)
         valid_road_polygons.append(poly)
         lane_polygon = union_all(valid_road_polygons)
-        lane_polygon.buffer(-0.2)
+        lane_polygon.buffer(-POLYGON_BUFFER)
         return lane_polygon
 
-    def safeDistanceSetForSection(self, xi:float, yi:float, v_i:float, xj:float, yj:float, v_j:float,cp, l_id, distance_to_add, ego_state) \
+    def safeDistanceSetForSection(
+            self,
+            xi:float,   yi:float,
+            preceding_velocity:float,
+            xj:float,   yj:float,
+            succeeding_velocity:float,
+            center_points,
+            lane_id,
+            distance_to_next_obstacle,
+            ego_state) \
             -> List[Tuple[float,float,float,Polygon]] :
         """
             This function takes the position and velocity of two Obstacles and the collision
@@ -369,14 +417,14 @@ class SafetyVerifier:
                - v -> Velocities of the ego vehicle
                - p -> Shapely Polygon
         """
-        if traveled_distance(cp,cp[-1]) < self.prop_ego["ego_length"]: return []
-        ct, s_centers, _, _ = self.precomputed_lane_polygons[l_id]
+        if compute_traveled_distance_along_curve(center_points, center_points[-1]) < self.prop_ego["ego_length"]: return []
+        ct, s_centers, _, _ = self.precomputed_lane_polygons[lane_id]
         txi, _ = ct.convert_to_curvilinear_coords(xi, yi)
         txj, _ = ct.convert_to_curvilinear_coords(xj, yj)
-        txj += distance_to_add
+        txj += distance_to_next_obstacle
         a_lat_max, a_lon_max, w, l, delta_react = (self.prop_ego["a_lat_max"], self.prop_ego["a_lon_max"],
                 self.prop_ego["ego_width"], self.prop_ego["ego_length"], self.prop_ego["delta_react"])
-        k = kappa(cp)
+        k = compute_mean_curvature(center_points)
         if k == 0:  r_min = math.inf
         else:   r_min = 1.0 / k
         v_crit = min(np.sqrt(r_min * a_lat_max),self.prop_ego["v_max"])
@@ -390,67 +438,67 @@ class SafetyVerifier:
         # z(v,j) = v^2/(2 a_ego(v)) - v_j^2/(2 a_j_max) + delta_react*v
         def zeta_preceding(v, v_j, a_lon_max, v_crit, delta_react):
             return (v ** 2) / (2 * abs(a_lon(v,a_lon_max,v_crit))) - (v_j ** 2) / (2 * abs(a_lon_max)) + delta_react * v
-        # z(v,i) = v_i^2/(2|a_i_max|) - v^2/(2|a_ego(v)|) + delta_react*v_i
-        def zeta_succeeding(v, v_i, a_lon_max, v_crit, delta_react):
-            return (v_i ** 2) / (2 * abs(a_lon_max)) - (v ** 2) / (2 * abs(a_lon(v,a_lon_max,v_crit))) + delta_react * v_i
+        # z(v,i) = preceding_velocity^2/(2|a_i_max|) - v^2/(2|a_ego(v)|) + delta_react*preceding_velocity
+        def zeta_succeeding(v, preceding_velocity, a_lon_max, v_crit, delta_react):
+            return (preceding_velocity ** 2) / (2 * abs(a_lon_max)) - (v ** 2) / (2 * abs(a_lon(v,a_lon_max,v_crit))) + delta_react * preceding_velocity
         for v in vs:
-            s_min_final = max(txi + zeta_succeeding(v,v_i,a_lon_max,v_crit,delta_react), 0)
-            s_max_final = txj - zeta_preceding(v,v_j,a_lon_max,v_crit,delta_react)
+            s_min_final = max(txi + zeta_succeeding(v,preceding_velocity,a_lon_max,v_crit,delta_react), 0)
+            s_max_final = txj - zeta_preceding(v, succeeding_velocity, a_lon_max, v_crit, delta_react)
             if s_min_final < s_max_final:
                 start = int(np.argmin(np.abs(s_centers - s_min_final)))
                 end = int(np.argmin(np.abs(s_centers - s_max_final)))
-                if start >= end-3: continue
-                safe_states.append((start,end, v, self.build_safe_area(start,end,l_id,ego_state)))
+                if start >= end - MIN_SEGMENT_LENGTH: continue
+                safe_states.append((start, end, v, self.build_safe_area(start, end, lane_id, ego_state)))
         return safe_states
 
-    def expand_area_in_succ(self, S):
-        ll_id = None if not self.ego_lanelet.adj_left_same_direction else self.ego_lanelet.adj_left
-        rl_id = None if not self.ego_lanelet.adj_right_same_direction else self.ego_lanelet.adj_right
+    def expand_area_in_succ(self, safe_states_sets):
+        left_lane_id = None if not self.ego_lanelet.adj_left_same_direction else self.ego_lanelet.adj_left
+        right_lane_id = None if not self.ego_lanelet.adj_right_same_direction else self.ego_lanelet.adj_right
         def comulate_polys(lanes):
             polys = []
-            for k,lane in S:
+            for k,lane in safe_states_sets:
                 if lane.lanelet_id in lanes:
                     spolys = []
-                    for s,e,_,p in k:
+                    for s,_,_,p in k:
                         if s == 0: spolys.append(p)
                     if not spolys: continue
                     polys.append(union_all(spolys).buffer(0.2))
             if not polys: return None
             return union_all(polys).buffer(0.2)
-        for i in range(len(S)):
-            ko,laneo = S[i]
-            if laneo.lanelet_id == self.ego_lanelet.lanelet_id: polys = comulate_polys(self.succsesors_to_add)
-            elif ll_id and laneo.lanelet_id == ll_id: polys = comulate_polys(self.succsesors_to_addl)
-            elif rl_id and laneo.lanelet_id == rl_id: polys = comulate_polys(self.succsesors_to_addr)
+        for i in range(len(safe_states_sets)):
+            ko,lane = safe_states_sets[i]
+            if lane.lanelet_id == self.ego_lanelet.lanelet_id: polys = comulate_polys(self.succsesors_to_add)
+            elif left_lane_id and lane.lanelet_id == left_lane_id: polys = comulate_polys(self.succsesors_to_addl)
+            elif right_lane_id and lane.lanelet_id == right_lane_id: polys = comulate_polys(self.succsesors_to_addr)
             else: continue
             if polys is None: continue
             nk = []
             for s,e,v,p in ko:
-                if e >= len(self.dense_lanes[laneo.lanelet_id][1]) - 1:
+                if e >= len(self.dense_lanes[lane.lanelet_id][1]) - 1:
                     p = p.buffer(0.2).union(polys)
                     nk.append((s,e,v,p.buffer(-0.2)))
                 else:
                     nk.append((s, e, v, p))
-            S[i] = (nk,laneo)
-        return S
+            safe_states_sets[i] = (nk, lane)
+        return safe_states_sets
 
-    def union_safe_set(self, ll: Lanelet, safe_set_list_left : List[Tuple[int,int,float,Polygon]]
-                            , rl : Lanelet, safe_set_list_right :List[Tuple[int,int,float,Polygon]]):
+    def union_safe_set(self, left_lane: Lanelet, safe_sets_list_left : List[Tuple[int,int,float,Polygon]]
+                        ,right_lane : Lanelet, safe_sets_list_right :List[Tuple[int,int,float,Polygon]]):
         """
             Does a left only union of the safe sets of two adjacent same direction lanes
             returns a List of the two new safe sets
         """
-        ct,ls, _, lrp = self.precomputed_lane_polygons[ll.lanelet_id]
-        center_points = self.dense_lanes[ll.lanelet_id][1]
+        ct,ls, _, lrp = self.precomputed_lane_polygons[left_lane.lanelet_id]
+        center_points = self.dense_lanes[left_lane.lanelet_id][1]
         nls = []
         nrs = []
-        for s in safe_set_list_left:
-            c1, c2, lv, _ = s
+        for left_safe_set in safe_sets_list_left:
+            c1, c2, lv, _ = left_safe_set
             l_start = int(ls[c1])
             l_end = int(ls[c2])
-            for c in safe_set_list_right:
-                c1, c2, rv, _ = c
-                _, rcp, rrp = self.dense_lanes[rl.lanelet_id]
+            for right_safe_set in safe_sets_list_right:
+                c1, c2, rv, _ = right_safe_set # overwritten as they are not needed anymore
+                _, rcp, rrp = self.dense_lanes[right_lane.lanelet_id]
                 try:
                     r_start, _ = ct.convert_to_curvilinear_coords(rcp[c1][0],rcp[c1][1])
                 except (CartesianProjectionDomainError, CurvilinearProjectionDomainLongitudinalError):
@@ -462,19 +510,19 @@ class SafetyVerifier:
                 start = max(l_start, r_start)
                 end = min(l_end, r_end)
                 if start < end:
-                    llp = self.dense_lanes[ll.lanelet_id][1].tolist()
+                    llp = self.dense_lanes[left_lane.lanelet_id][1].tolist()
                     flrp = []
                     for p in lrp:
                         flrp.append(ct.convert_to_cartesian_coords(p[0], p[1] - 4))
-                    rct,_,rlp,_ = self.precomputed_lane_polygons[rl.lanelet_id]
+                    rct,_,rlp,_ = self.precomputed_lane_polygons[right_lane.lanelet_id]
                     frlp = []
                     for p in rlp:
                         frlp.append(rct.convert_to_cartesian_coords(p[0], p[1] + 4))
                     nls.append((start, end, lv, Polygon(llp + flrp[::-1]).buffer(0)))
                     nrs.append((start, end, rv, Polygon(frlp + rrp.tolist()[::-1]).buffer(0)))
-        return [(nls,ll), (nrs,rl)]
+        return [(nls, left_lane), (nrs, right_lane)]
 
-    def safeDistanceSet(self, ego_lanelet : Lanelet, in_or_entering_intersection,ego_state):
+    def safeDistanceSet(self, ego_lanelet : Lanelet, is_in_or_approaching_intersection,ego_state):
         """
             Constructs the list of the admissible velocities and locations for the ego Vehicle.
                 We must first construct Collision free areas as:
@@ -490,44 +538,45 @@ class SafetyVerifier:
                     - Lane
         """
         self.ego_lanelet = ego_lanelet
-        self.l_id = self.ego_lanelet.adj_left if self.ego_lanelet.adj_left_same_direction else None
-        self.r_id = self.ego_lanelet.adj_right if self.ego_lanelet.adj_right_same_direction else None
+        self.left_id = self.ego_lanelet.adj_left if self.ego_lanelet.adj_left_same_direction else None
+        self.right_id = self.ego_lanelet.adj_right if self.ego_lanelet.adj_right_same_direction else None
         self.time_step += 1
-        S : List[Tuple[List[Tuple[float,float,float,Polygon]],Lanelet]] = []
-        C = []
+        safe_states_sets : List[Tuple[List[Tuple[float,float,float,Polygon]],Lanelet]] = []
+        collision_free_sections = []
         for lane in self.get_reachable_lanes():
-            C.extend(self.get_lane_collision_free_areas(lane))
-        for c in C:
-            cp, l, vi, vj, d = c
-            if len(cp) < 3 : continue
-            S.append((self.safeDistanceSetForSection(cp[0][0],cp[0][1],vi,cp[-1][0],cp[-1][1],vj,cp,l.lanelet_id,d,ego_state),l))
-        #   For lane change we must have parts where the safe bounds don't exist,
-        #   we do this by expanding the bounds into the adj lane when two safe states area are next to each other.
-        #   We only do unions to the left side i.e. left lane with ego and ego with right lane.
-        S = self.expand_area_in_succ(S)
-        es = []
-        for s in S:
-            k, lane = s
+            collision_free_sections.extend(self.get_lane_collision_free_areas(lane))
+        for c in collision_free_sections:
+            center_points, lane, preceding_velocity, succeeding_velocity, distance_to_next_obs = c
+            if len(center_points) < 3 : continue
+            safe_states_sets.append((self.safeDistanceSetForSection(center_points[0][0], center_points[0][1],
+                                                                    preceding_velocity, center_points[-1][0],
+                                                                    center_points[-1][1], succeeding_velocity,
+                                                                    center_points, lane.lanelet_id,
+                                                                    distance_to_next_obs, ego_state), lane))
+        safe_states_sets = self.expand_area_in_succ(safe_states_sets)
+        ego_safe_states = []
+        for s in safe_states_sets:
+            safe_sets, lane = s
             if lane.lanelet_id == self.ego_lanelet.lanelet_id:
-                es.extend(k)
-        if not in_or_entering_intersection:
-            if self.l_id:
-                ll : Lanelet = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
-                ls = []
-                for s in S:
-                    k, lane = s
-                    if lane.lanelet_id == ll.lanelet_id:
-                        ls.extend(k)
-                S.extend(self.union_safe_set(ll,ls,self.ego_lanelet,es))
+                ego_safe_states.extend(safe_sets)
+        if not is_in_or_approaching_intersection:
+            if self.left_id:
+                left_lane : Lanelet = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_left)
+                left_safe_sets = []
+                for s in safe_states_sets:
+                    safe_sets, lane = s
+                    if lane.lanelet_id == left_lane.lanelet_id:
+                        left_safe_sets.extend(safe_sets)
+                safe_states_sets.extend(self.union_safe_set(left_lane, left_safe_sets, self.ego_lanelet, ego_safe_states))
             if self.ego_lanelet.adj_right_same_direction:
-                rl : Lanelet = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right)
-                rs = []
-                for s in S:
-                    k, lane = s
-                    if lane.lanelet_id == rl.lanelet_id:
-                        rs.extend(k)
-                S.extend(self.union_safe_set(self.ego_lanelet,es,rl,rs))
-        self.safe_set = S
+                right_lane : Lanelet = self.scenario.lanelet_network.find_lanelet_by_id(self.ego_lanelet.adj_right)
+                right_safe_sets = []
+                for s in safe_states_sets:
+                    safe_sets, lane = s
+                    if lane.lanelet_id == right_lane.lanelet_id:
+                        right_safe_sets.extend(safe_sets)
+                safe_states_sets.extend(self.union_safe_set(self.ego_lanelet, ego_safe_states, right_lane, right_safe_sets))
+        self.safe_set = safe_states_sets
 
     def compute_kappa_dot_dot(self, l_id, nxt_id, state):
         center_points = self.dense_lanes[l_id][1]
@@ -541,54 +590,56 @@ class SafetyVerifier:
                         self.dense_lanes[nxt_id][1] if nxt_id != 0 else None,
                         self.precomputed_lane_polygons[nxt_id][0] if nxt_id != 0 else None)
 
-    def find_safe_jerk_dot(self, ego_action, kappa_ddot, l_id, nxt_id):
+    def find_safe_jerk_dot(self, ego_action, kappa_ddot, current_lane_id, next_lane_id):
         """
             Binary search for the min and max jerk_dot for given kappa_dot_dot.
             Using the binary search made it has constant complexity of 18 iterations for each 36 checks in total
         """
-        low, high = -0.6, 0.6
-        while high - low > 1e-5:
+        low, high = JERK_BINARY_SEARCH_MIN, JERK_BINARY_SEARCH_MAX
+        while high - low > SMALL_EPS:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
-            if self.safe_action_check(mid, kappa_ddot, copy_action, 0, l_id, nxt_id):
+            if self.safe_action_check(mid, kappa_ddot, copy_action,
+                                      current_lane_id, next_lane_id):
                 high = mid
             else:   low = mid
         safe_min = high
-        low, high = -0.6, 0.6
-        while high - low > 1e-5:
+        low, high = JERK_BINARY_SEARCH_MIN, JERK_BINARY_SEARCH_MAX
+        while high - low > SMALL_EPS:
             mid = (low + high) / 2
             copy_action : ContinuousAction = copy.deepcopy(ego_action)
-            if self.safe_action_check(mid, kappa_ddot, copy_action, 0, l_id, nxt_id):
+            if self.safe_action_check(mid, kappa_ddot, copy_action,
+                                      current_lane_id, next_lane_id):
                 low = mid
             else:   high = mid
         safe_max = low
         return safe_min, safe_max
 
-    def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
-        for i in range(9):
-            current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
-            if not (-0.8 <= current_val <= 0.8):    continue
+    def find_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0):
+        """
+            Finds a feisable jerk dot for given kappa_dot_dot. If non found returns -2.
+        """
+        for i in range(JERK_SEARCH_ITERATIONS):
+            current_val = (JERK_SEARCH_STEP * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
+            if not (JERK_DOT_MIN <= current_val <= JERK_DOT_MAX):    continue
             copy_action: ContinuousAction = copy.deepcopy(ego_action)
-            if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
+            if self.safe_action_check(current_val, kappa_ddot, copy_action, l_id, nxt_id):
                 return current_val
         return -2
 
-    def check_feisable_jerk_dot(self, ego_action, kappa_ddot, l_id = 0, nxt_id = 0, k = 0):
-        for i in range(9):
-            current_val = (0.05 * ((i + 1) // 2)) * (1 if i % 2 != 0 else -1)
-            copy_action: ContinuousAction = copy.deepcopy(ego_action)
-            if self.safe_action_check(current_val, kappa_ddot, copy_action, k, l_id, nxt_id):
-                return True
-        return False
-
-    def safe_action_check(self, jd, kdd, ego_action : Action, q = 0, l_id = 0, nxt_id = 0):
-        #if q == 1:  return True
-        #q += 1
-        ego_action.step(np.array([jd,kdd]))
+    def safe_action_check(
+            self,
+            jerk_dot: float,
+            kappa_dot_dot: float,
+            ego_action : Action,
+            current_lane_id: int = 0,
+            next_lane_id: int = 0
+    ):
+        ego_action.step(np.array([jerk_dot, kappa_dot_dot]))
         new_vehicle_state = ego_action.vehicle.state
         p = new_vehicle_state.position
         nv = new_vehicle_state.velocity
-        if nv < 0 or nv > 40:   return False
+        if nv < VELOCITY_MIN or nv > VELOCITY_MAX:   return False
         W, L = self.prop_ego["ego_width"], self.prop_ego["ego_length"]
         rect = Polygon([(-L / 2, -W / 2), (-L / 2, W / 2), (L / 2, W / 2), (L / 2, -W / 2)])
         rect = rotate(rect, new_vehicle_state.orientation * 180 / math.pi, origin=(0, 0), use_radians=False)
@@ -598,20 +649,20 @@ class SafetyVerifier:
         s = math.sin(new_vehicle_state.orientation)
         local = [[hl, hw], [-hl, hw], [-hl, -hw], [hl, -hw]]
         corners = []
-        for k in local:
-            r = [k[0] * c - k[1] * s, k[0] * s + k[1] * c]
+        for offsets in local:
+            r = [offsets[0] * c - offsets[1] * s, offsets[0] * s + offsets[1] * c]
             corners.append(np.array([p[0] + r[0], p[1] + r[1]]))
         try:
             curr_l = self.scenario.lanelet_network.find_lanelet_by_position(corners)
             curr_l = [item for sublist in curr_l for item in sublist]
         except:
             curr_l = None
-        for s in self.safe_set:
-            k, lane = s
+        for safe_tuple in self.safe_set:
+            safe_sets, lane = safe_tuple
             if curr_l is not None and lane.lanelet_id not in curr_l: continue
-            for start, end, v, poly in k:
+            for start, end, v, poly in safe_sets:
                 if v - 1 > nv: break
-                if start == end or not (v - .35 <= nv <= v + .35) : continue
+                if start == end or not (v - SAFE_VELOCITY_TOLERANCE <= nv <= v + SAFE_VELOCITY_TOLERANCE) : continue
                 ct,s,_,_ = self.precomputed_lane_polygons[lane.lanelet_id]
                 try:
                     ps, _ = ct.convert_to_curvilinear_coords(p[0], p[1])
@@ -619,8 +670,8 @@ class SafetyVerifier:
                     continue
                 if not s[int(start)] <= ps <= s[int(end)]: continue
                 if poly.contains(rect):
-                    kdd = self.compute_kappa_dot_dot(l_id,nxt_id,new_vehicle_state)
-                    if kdd > 0.7 or kdd < -0.7: return False
+                    kappa_dot_dot = self.compute_kappa_dot_dot(current_lane_id, next_lane_id, new_vehicle_state)
+                    if abs(kappa_dot_dot) > MAX_KAPPA_DOT_DOT: return False
                     #if self.check_feisable_jerk_dot(ego_action, kdd, l_id, nxt_id, q):   
                     return True
         return False
@@ -648,15 +699,15 @@ class SafetyLayer(CommonroadEnv):
         self.precomputed_lane_polygons : Dict[int, Tuple[CurvilinearCoordinateSystem, np.ndarray, np.ndarray, np.ndarray]] = {}
         self.dense_lanes : Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
         self.safety_verifier : SafetyVerifier = None
-        self.in_or_entering_intersection = False
+        self.is_in_or_approaching_intersection = False
         self.new_low = np.concatenate([self.observation_collector.observation_space.low.astype(np.float64),
                                         np.full(35, -1.0, dtype=np.float64)])
         self.new_high = np.concatenate([self.observation_collector.observation_space.high.astype(np.float64),
                                         np.full(35, 1.0, dtype=np.float64)])
-        self.l_id = 0
-        self.nxt_id = 0
+        self.current_lane_in_route_id = 0
+        self.next_lane_in_route_id = 0
         self.kappa_dds = []
-        self.type = 0
+        self.lane_recovery_mode = 0
         self.cache : Dict[int, Tuple[Dict[int, Tuple[CurvilinearCoordinateSystem, np.ndarray, np.ndarray, np.ndarray]],
                     defaultdict[int, List[Tuple[Lanelet, bool]]], Dict[int,Tuple[np.ndarray, np.ndarray, np.ndarray]]]] = {}
 
@@ -684,7 +735,7 @@ class SafetyLayer(CommonroadEnv):
         return vec
 
     def apply_safety(self, observation,terminated):
-        if self.in_or_entering_intersection:
+        if self.is_in_or_approaching_intersection:
             actions = self.intersection_safety()
         else:
             self.pre_intersection_lanes = None
@@ -704,15 +755,16 @@ class SafetyLayer(CommonroadEnv):
         _, center_points, _ = self.dense_lanes[self.observation_collector.ego_lanelet.lanelet_id]
         ego_pos = np.asarray(self.observation_collector._ego_state.position).reshape(1 ,2)
         closest_centerpoint = center_points[np.linalg.norm(center_points - ego_pos, axis=1).argmin()]
-        self.observation["distance_to_lane_end"] = traveled_distance(center_points[::-1],closest_centerpoint)
+        self.observation["distance_to_lane_end"] = compute_traveled_distance_along_curve(center_points[::-1],
+                                                                                         closest_centerpoint)
 
     def reset(self, seed=None, options: Optional[dict] = None, benchmark_id=None, scenario: Scenario = None,
               planning_problem: PlanningProblem = None) -> np.ndarray:
         self.past_ids = []
         initial_observation, info = super().reset(seed, options, benchmark_id, scenario, planning_problem)
         self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
-        self.l_id = self.observation_collector.ego_lanelet.lanelet_id
-        self.nxt_id = 0
+        self.current_lane_in_route_id = self.observation_collector.ego_lanelet.lanelet_id
+        self.next_lane_in_route_id = 0
         self.time_step = 0
         self.time_step = 0
         scenario_num = int(self.scenario.scenario_id.map_name[3])
@@ -726,8 +778,8 @@ class SafetyLayer(CommonroadEnv):
         self.get_distance_to_lane_end()
         self.safety_verifier = SafetyVerifier(self.scenario, self.prop_ego, self.precomputed_lane_polygons,
                                               self.dense_lanes, self.observation_collector.ego_lanelet.lanelet_id)
-        self.in_or_entering_intersection = self.intersection_check()
-        self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
+        self.is_in_or_approaching_intersection = self.intersection_check()
+        self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.is_in_or_approaching_intersection,self.observation_collector._ego_state)
         self.pre_intersection_lanes = None
         observation_vector = self.apply_safety(initial_observation,False)
         return observation_vector, info
@@ -822,19 +874,19 @@ class SafetyLayer(CommonroadEnv):
                     self.conflict_lanes[l.lanelet_id].append((k,relation == 1))
 
     def check_safety(self,action,action_copy):
-        if self.l_id == 0: self.l_id = self.observation_collector.ego_lanelet.lanelet_id
-        fall_back_kkd = self.compute_kappa_dot_dot(self.l_id, 0)
+        if self.current_lane_in_route_id == 0: self.current_lane_in_route_id = self.observation_collector.ego_lanelet.lanelet_id
+        fall_back_kkd = self.compute_kappa_dot_dot(self.current_lane_in_route_id, 0)
         fall_back_jd =  -0.1 if self.observation["v_ego"] > 2 else 0.1
         if action[0] > 0.7 or action[1] > 0.7 or action[0] < -0.7 or action[1] < -0.7:
             reward_for_safe_action = 0
-            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fall_back_kkd,self.l_id,self.nxt_id,0)
+            a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, fall_back_kkd, self.current_lane_in_route_id, self.next_lane_in_route_id)
             if a == -2: a = fall_back_jd
             action = np.array([a,fall_back_kkd])
         else:
-            if self.safety_verifier.safe_action_check(action[0],action[1], action_copy,0,self.l_id,self.nxt_id):
+            if self.safety_verifier.safe_action_check(action[0], action[1], action_copy, self.current_lane_in_route_id, self.next_lane_in_route_id):
                 reward_for_safe_action = 1
             else:
-                a =  self.safety_verifier.find_feisable_jerk_dot(self.ego_action,action[1],self.l_id,self.nxt_id,0)
+                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, action[1], self.current_lane_in_route_id, self.next_lane_in_route_id)
                 if a != -2:
                     action[0] = a
                     reward_for_safe_action = 0.5
@@ -844,40 +896,44 @@ class SafetyLayer(CommonroadEnv):
                     if np.all(actions == 0):
                         action = np.array([fall_back_jd,fall_back_kkd])
                     else:
-                        if self.type == 1:
+                        if self.lane_recovery_mode == 1:
                             for x in [1,0,2]:
-                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[x], self.l_id, self.nxt_id, 0)
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, actions[x], self.current_lane_in_route_id,
+                                                                                self.next_lane_in_route_id)
                                 if a != -2:
                                     action = np.array([a, actions[x]])
                                     break
-                        elif self.type == 2:
-                            fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
+                        elif self.lane_recovery_mode == 2:
+                            fcl_input = self.compute_kappa_dot_dot(self.current_lane_in_route_id,self.next_lane_in_route_id)
                             h = action[1]
                             a = -2
                             while a == -2 and fcl_input < 0.8:
-                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0)
-                                fcl_input += 0.5
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, fcl_input, self.current_lane_in_route_id,
+                                                                                self.next_lane_in_route_id)
+                                fcl_input += 0.05
                             if a == -2: a = action[0]
                             else:   h = fcl_input
                             action = np.array([a,h])
-                        elif self.type == 3:
-                            fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
+                        elif self.lane_recovery_mode == 3:
+                            fcl_input = self.compute_kappa_dot_dot(self.current_lane_in_route_id,self.next_lane_in_route_id)
                             h = action[1]
                             a = -2
                             while a == -2 and fcl_input > -0.8:
-                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0)
-                                fcl_input -= 0.5
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, fcl_input, self.current_lane_in_route_id,
+                                                                                self.next_lane_in_route_id)
+                                fcl_input -= 0.05
                             if a == -2: a = action[0]
                             else:   h = fcl_input
                             action = np.array([a,h])
                         else:
-                            fcl_input = self.compute_kappa_dot_dot(self.l_id,self.nxt_id)
+                            fcl_input = self.compute_kappa_dot_dot(self.current_lane_in_route_id,self.next_lane_in_route_id)
                             h = action[1]
                             a = -2
                             for i in range(11):
                                 fcl_input = fcl_input + ((0.05 * ((i + 1) // 2)) * 1 if i % 2 != 0 else -1)
                                 if not (-0.8 <= fcl_input <= 0.8):    continue
-                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action,fcl_input,self.l_id,self.nxt_id,0)
+                                a = self.safety_verifier.find_feisable_jerk_dot(self.ego_action, fcl_input, self.current_lane_in_route_id,
+                                                                                self.next_lane_in_route_id)
                                 if a != -2: break
                             if a == -2: a = action[0]
                             else:   h = fcl_input
@@ -894,21 +950,21 @@ class SafetyLayer(CommonroadEnv):
             self.past_ids.append(self.observation_collector.ego_lanelet.lanelet_id)
         if reward_for_safe_action:
             reward += 6
-            if self.in_or_entering_intersection:
+            if self.is_in_or_approaching_intersection:
                 reward += self.safe_reward(action, in_intersection, in_conflict)
         else:
             reward -= 3
         self.observation = observation
         self.get_distance_to_lane_end()
         self.time_step += 1
-        self.in_or_entering_intersection = self.intersection_check()
+        self.is_in_or_approaching_intersection = self.intersection_check()
         if terminated and self.time_step <= 2:
             if self.observation["is_off_road"][0] == True: 
                 reward+=150
             elif self.observation["is_goal_reached"][0] == True:
                 reward-=300
         if self.time_step % 5 == 0:
-            self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.in_or_entering_intersection,self.observation_collector._ego_state)
+            self.safety_verifier.safeDistanceSet(self.observation_collector.ego_lanelet,self.is_in_or_approaching_intersection,self.observation_collector._ego_state)
         else: self.safety_verifier.time_step += 1
         observation_vector = self.apply_safety(observation, terminated)
         return observation_vector, reward, terminated, truncated, info
@@ -916,10 +972,9 @@ class SafetyLayer(CommonroadEnv):
     def safe_reward(self, action, in_intersection, in_conflict):
         in_conflict_after = self.observation_collector.conflict_zone.check_in_conflict_region(self.observation_collector._ego_vehicle)
         reward_for_exiting_conflict_zone = 0
-        penalty_for_slowing_down_in_conflict_zone = 0
         priority_non_compliance = 0
         entering_occupied_conflict_zone = 0
-        not_slowing_occupied_conflict_zone = 0
+        accelerating_in_conflict_zone = 0
         slowing_in_conflict_zone = 0
         if not in_intersection :
             if self.final_priority == 1:
@@ -937,7 +992,7 @@ class SafetyLayer(CommonroadEnv):
                     for l,_ in cl:
                         if l.get_obstacles(self.scenario.obstacles):
                             if action[1] > 0:
-                                not_slowing_occupied_conflict_zone = 1
+                                accelrating_in_conflict_zone = 1
                             break
             else: # entered conflict area
                 if not in_conflict:
@@ -949,12 +1004,11 @@ class SafetyLayer(CommonroadEnv):
                 else:
                     if action[1] < 0.1:
                         slowing_in_conflict_zone = 1
-        return (5  *  reward_for_exiting_conflict_zone +
-                -2  *  penalty_for_slowing_down_in_conflict_zone +
-                -2  *  priority_non_compliance +
-                -4  *  entering_occupied_conflict_zone +
-                1  *  not_slowing_occupied_conflict_zone +
-                -1  *  slowing_in_conflict_zone)
+        return ( 5   *  reward_for_exiting_conflict_zone +
+                -2   *  priority_non_compliance +
+                -4   *  entering_occupied_conflict_zone +
+                 1   *  accelrating_in_conflict_zone +
+                -1   *  slowing_in_conflict_zone)
 
     def intersection_check(self):
         nearest, farthest = self.observation["ego_distance_intersection"]
@@ -985,17 +1039,23 @@ class SafetyLayer(CommonroadEnv):
         if curr_l.adj_left_same_direction and curr_l.adj_left == other: return True
         return False
 
-    def wrong_lane_choice_fall_back(self,route_ids):
+    def wrong_lane_choice_fall_back(self, route_ids):
         last_index = route_ids.index(self.past_ids[len(self.past_ids) - 2])
         if self.neighbor_check(self.observation_collector.ego_lanelet.lanelet_id, route_ids[last_index]):
-            l_id, nxt_id = route_ids[last_index], route_ids[last_index + 1] if len(route_ids) > last_index + 1 else 0
-            fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)  # swerved into a neighbor
+            current_lane_in_route_id, next_lane_in_route_id = route_ids[last_index], route_ids[last_index + 1] if len(route_ids) > last_index + 1 else 0
+            fcl_input = self.compute_kappa_dot_dot(current_lane_in_route_id, next_lane_in_route_id)  # swerved into a neighbor
         else:  # got into a wrong successor
-            l_id, nxt_id = route_ids[last_index + 1], route_ids[last_index + 2] if len(route_ids) > last_index + 2 else 0
-            fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
-        self.type = 1
-        kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # return to the route
-        return l_id, nxt_id, kappa_dot_dots
+            current_lane_in_route_id, next_lane_in_route_id = route_ids[last_index + 1], route_ids[last_index + 2] if len(route_ids) > last_index + 2 else 0
+            fcl_input = self.compute_kappa_dot_dot(current_lane_in_route_id, next_lane_in_route_id)
+        self.lane_recovery_mode = 1
+        kappa_dot_dots = np.linspace(max(fcl_input - 0.05, -MAX_KAPPA_DOT_DOT)
+                        , min(fcl_input + 0.05,MAX_KAPPA_DOT_DOT), 3)  # return to the route
+        At_safe = []
+        for kdd in kappa_dot_dots:
+            safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, current_lane_in_route_id, next_lane_in_route_id)
+            if safe_min <= safe_max:    At_safe.extend([kdd, safe_min, safe_max])
+            else:   At_safe.extend([kdd , 0, 0])
+        return current_lane_in_route_id, next_lane_in_route_id, At_safe
 
     def lane_safety(self):
         """
@@ -1016,29 +1076,30 @@ class SafetyLayer(CommonroadEnv):
             fcl_input = self.compute_kappa_dot_dot(l_id, nxt_id)
             if self.observation_collector.ego_lanelet.adj_left_same_direction:
                 if self.observation_collector.ego_lanelet.adj_right_same_direction:
-                    self.type = 4
-                    kappa_dot_dots = np.linspace(-0.8, 0.8, 11) # left, current and right
+                    self.lane_recovery_mode = 4
+                    kappa_dot_dots = np.linspace(-MAX_KAPPA_DOT_DOT, MAX_KAPPA_DOT_DOT, 11) # left, current and right
                 else:
-                    self.type = 2
-                    kappa_dot_dots = np.linspace(fcl_input - 0.1, 0.8, 11) # left and current
+                    self.lane_recovery_mode = 2
+                    kappa_dot_dots = np.linspace(max(fcl_input - 0.1,-MAX_KAPPA_DOT_DOT), 0.8, 11) # left and current
             elif self.observation_collector.ego_lanelet.adj_right_same_direction:
-                self.type = 3
-                kappa_dot_dots = np.linspace(-0.8, fcl_input + 0.1, 11) # current and right
+                self.lane_recovery_mode = 3
+                kappa_dot_dots = np.linspace(-MAX_KAPPA_DOT_DOT, min(fcl_input + 0.1,MAX_KAPPA_DOT_DOT), 11) # current and right
             else:
-                self.type = 1
-                kappa_dot_dots = np.linspace(fcl_input-0.05, fcl_input+0.05, 3) # only current lane
+                self.lane_recovery_mode = 1
+                kappa_dot_dots = np.linspace(max(fcl_input - 0.05, -MAX_KAPPA_DOT_DOT)
+                            ,min(fcl_input + 0.05,MAX_KAPPA_DOT_DOT), 3)  # only current lane
         for kdd in kappa_dot_dots:
-            safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd,l_id,nxt_id)
+            safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
             if safe_min <= safe_max:    At_safe_l.extend([kdd, safe_min, safe_max])
             else: At_safe_l.extend([kdd,0,0])
             #At_safe_l.extend([kdd])
-        self.l_id, self.nxt_id = l_id, nxt_id
+        self.current_lane_in_route_id, self.next_lane_in_route_id = l_id, nxt_id
         return np.array(At_safe_l, dtype=object)
 
     def priority_condition(self, lane : Lanelet,obstacle : Obstacle, D_m=30.0, T_a=3.0):
         """
             d_c_i : float Distance of vehicle i to the conflict area (meters)
-            v_i : float Velocity of vehicle i (m/s)
+            preceding_velocity : float Velocity of vehicle i (m/s)
             D_m : float Monitoring range (default: 30 m)
             T_a : float Arrival time threshold (default: 3 s)
         Returns:
@@ -1052,7 +1113,7 @@ class SafetyLayer(CommonroadEnv):
             if math.dist(pos, cp) < dist:
                 dist = math.dist(pos, cp)
                 curr = cp
-        d_c_i = traveled_distance(c[::-1],curr)
+        d_c_i = compute_traveled_distance_along_curve(c[::-1], curr)
         return (d_c_i <= D_m) or (d_c_i / obstacle.state_at_time(self.time_step).velocity <= T_a)
 
     def priority(self, lane : Lanelet, pre_intersection_lanes):
@@ -1116,14 +1177,15 @@ class SafetyLayer(CommonroadEnv):
                 if self.observation_collector.ego_lanelet.lanelet_id in self.conflict_lanes.keys():
                     self.final_priority = 1
                 fcl_input = self.compute_kappa_dot_dot(self.observation_collector.ego_lanelet.lanelet_id,route_ids[curr_index + 1] if len(route_ids) > curr_index + 1 else 0)
-            self.type = 1
-            kappa_dot_dots = np.linspace(fcl_input - 0.05, fcl_input + 0.05, 3)  # only current lane
+            self.lane_recovery_mode = 1
+            kappa_dot_dots = np.linspace(max(fcl_input - 0.05, -MAX_KAPPA_DOT_DOT)
+                            ,min(fcl_input + 0.05,MAX_KAPPA_DOT_DOT), 3)  # only current lane
         for kdd in kappa_dot_dots:
             safe_min, safe_max = self.safety_verifier.find_safe_jerk_dot(self.ego_action, kdd, l_id, nxt_id)
             if safe_min <= safe_max:    At_safe_in.extend([kdd, safe_min, safe_max])
             else:   At_safe_in.extend([kdd , 0, 0])
             #At_safe_in.extend([kdd])
-        self.l_id, self.nxt_id = l_id, nxt_id
+        self.current_lane_in_route_id, self.next_lane_in_route_id = l_id, nxt_id
         return np.array(At_safe_in, dtype=object)
 
     @property
