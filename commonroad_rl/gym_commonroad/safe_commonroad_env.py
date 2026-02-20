@@ -974,7 +974,7 @@ class SafetyLayer(CommonroadEnv):
         reward_for_exiting_conflict_zone = 0
         priority_non_compliance = 0
         entering_occupied_conflict_zone = 0
-        accelerating_in_conflict_zone = 0
+        accelrating_in_conflict_zone = 0
         slowing_in_conflict_zone = 0
         if not in_intersection :
             if self.final_priority == 1:
