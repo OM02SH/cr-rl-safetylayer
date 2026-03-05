@@ -59,7 +59,7 @@ To use this environment, you must integrate it with the provided version of the 
 
 ```bash
 # Run the modified tutorial script
-python RLtut1.py
+python commonroad_rl/RLtut1.py
 ```
 
 ---
