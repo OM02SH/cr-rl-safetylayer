@@ -7,7 +7,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env  import DummyVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 
-log_path = "tutorials/logs/safe/final/"
+log_path = "tutorials/logs/"
 
 env_configs = {}
 with open(os.path.join(log_path, "environment_configurations.yml"), "r") as config_file:
