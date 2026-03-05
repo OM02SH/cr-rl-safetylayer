@@ -1,3 +1,13 @@
+"""
+Safe CommonRoad Environment Wrapper
+Author: [Omar Shaat/OM02SH]
+Email: omar.shaat@tum.de
+Description: This module extends the CommonroadEnv from the CommonRoad-RL 
+             framework to include formal safety verification layers.
+             
+Based on: CommonRoad-RL (https://commonroad.in.tum.de/)
+"""
+
 import math
 from collections import defaultdict
 import numpy as np
