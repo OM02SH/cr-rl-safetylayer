@@ -4,7 +4,7 @@ This repository contains a specialized safety-constrained Reinforcement Learning
 
 ## Overview
 
-The core of this project is `safe_commonroad_env.py`, which introduces a `SafetyLayer` wrapper and a `SafetyVerifier`. Unlike standard RL environments where the agent's output is directly applied to the vehicle, this system treats agent outputs as "proposed actions" that are modified if they risk violating safety constraints.
+The core of this project is `commonroad_rl/gym_commonroad/safe_commonroad_env.py`, which introduces a `SafetyLayer` wrapper and a `SafetyVerifier`. Unlike standard RL environments where the agent's output is directly applied to the vehicle, this system treats agent outputs as "proposed actions" that are modified if they risk violating safety constraints.
 
 
 
